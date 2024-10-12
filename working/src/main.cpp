@@ -142,23 +142,6 @@ bool allSensorsDetectBlack(int sensors[]) {
   return true; // Return true if all sensors detect values above the threshold
 }
 
-char detectBend() {
-  // Check the last few entries in history to detect a bend pattern
-  for (int i = 0; i < historySize; i++) {
-    // Check if the two center sensors are 1 (black) and all sensors on one side are 0 (white)
-         (senHistory[i][0] == 1 && senHistory[i][1] == 1 && senHistory[i][2] == 1) {
-      return 'r';  // Use single quotes for character literals
-    } else if ((senHistory[i][3] == 1 && senHistory[i][4] == 1) &&  // Center sensors detecting black
-               (senHistory[i][7] == 1 && senHistory[i][6] == 1 && senHistory[i][5] == 1)) {
-      return 'l';  // Use single quotes for character literals
-    } else if ((senHistory[i][3] == 1 && senHistory[i][4] == 1) &&  // Center sensors detecting black
-               (senHistory[i][0] == 1 && senHistory[i][1] == 1 && senHistory[i][2] == 1) &&
-               (senHistory[i][7] == 1 && senHistory[i][6] == 1 && senHistory[i][5] == 1)) {
-      return 'b';  // Use single quotes for character literals
-    }
-  }
-  return ' ';  // Return a default value if no pattern is detected
-}
 
 void processLineFollowing(int sen[]) {
   int position = calculatePosition(sen);
