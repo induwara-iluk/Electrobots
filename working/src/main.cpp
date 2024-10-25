@@ -1,13 +1,16 @@
 #include <Arduino.h>
 
-const int B_L = 9;
-const int B_R = 7;
 
-const int FL = 10;
+#include <oled.h>
+
+const int B_L = 2;
+const int FL = 3;
+const int PWML = 4;
+
+const int B_R = 5;
 const int FR = 6;
+const int PWMR = 7;
 
-const int PWMR = 5;
-const int PWML = 11;
 
 const int leftIR = A8;
 const int rightIR = A9;
@@ -24,9 +27,17 @@ int stage = 1;
 const int historySize = 10; // Size of the history buffer
 int senHistory[historySize][8]; // History array to store past sensor states
 int historyIndex = 0; // Current index for appending in the history array
+
 const int sensorThresholds = 200; // Threshold to distinguish black and white
 
-// Function Definitions
+
+
+oled oledDisplay;
+
+
+
+
+
 void initializePins() {
   for (int i = A0; i <= A9; i++) {
     pinMode(i, INPUT);
@@ -40,18 +51,25 @@ void initializePins() {
   pinMode(PWML, OUTPUT);
 }
 
+
+
 void readSensors(int sensors[]) {
+  String irValues_str = "";
   for (int i = 0; i < 8; i++) {
     sensors[i] = analogRead(A0 + i);
     Serial.print(sensors[i]);
     Serial.print(" ");
+    irValues_str+= sensors[i];  
+    irValues_str+=" ";
     
   }
+  oledDisplay.displayText(irValues_str,1,0,10);
   Serial.print(analogRead(A8));
   Serial.print(" ");
   Serial.print(analogRead(A9));
  Serial.println("");
 }
+
 
 void setMotorSpeed(int leftSpeed, int rightSpeed) {
   leftSpeed = constrain(leftSpeed, -255, 255);
@@ -80,6 +98,7 @@ void setMotorSpeed(int leftSpeed, int rightSpeed) {
   }
 }
 
+
 void turnBend(byte direction){
 
   // 0 = left , 1 = right
@@ -102,6 +121,8 @@ void turnBend(byte direction){
 
 }
 
+
+
 void convertSensorsToBinary(int sensors[], int sen[]) {
   for (int i = 0; i < 8; i++) {
     sen[i] = (sensors[i] < sensorThresholds) ? 1 : 0;
@@ -114,6 +135,8 @@ void updateSensorHistory(int sen[]) {
   }
   historyIndex = (historyIndex + 1) % historySize; // Circular buffer
 }
+
+
 
 int calculatePosition(int sensors[]) {
   int sum = 0;
@@ -142,6 +165,24 @@ bool allSensorsDetectBlack(int sensors[]) {
   return true; // Return true if all sensors detect values above the threshold
 }
 
+char detectBend() {
+  // Check the last few entries in history to detect a bend pattern
+  for (int i = 0; i < historySize; i++) {
+    // Check if the two center sensors are 1 (black) and all sensors on one side are 0 (white)
+    if ((senHistory[i][3] == 1 && senHistory[i][4] == 1) &&  // Center sensors detecting black
+        (senHistory[i][0] == 1 && senHistory[i][1] == 1 && senHistory[i][2] == 1)) {
+      return 'r';  // Use single quotes for character literals
+    } else if ((senHistory[i][3] == 1 && senHistory[i][4] == 1) &&  // Center sensors detecting black
+               (senHistory[i][7] == 1 && senHistory[i][6] == 1 && senHistory[i][5] == 1)) {
+      return 'l';  // Use single quotes for character literals
+    } else if ((senHistory[i][3] == 1 && senHistory[i][4] == 1) &&  // Center sensors detecting black
+               (senHistory[i][0] == 1 && senHistory[i][1] == 1 && senHistory[i][2] == 1) &&
+               (senHistory[i][7] == 1 && senHistory[i][6] == 1 && senHistory[i][5] == 1)) {
+      return 'b';  // Use single quotes for character literals
+    }
+  }
+  return ' ';  // Return a default value if no pattern is detected
+}
 
 void processLineFollowing(int sen[]) {
   int position = calculatePosition(sen);
@@ -159,6 +200,8 @@ void processLineFollowing(int sen[]) {
   setMotorSpeed(leftSpeed, rightSpeed);
   lastError = error;
 }
+
+
 
 void stopRobot() {
   analogWrite(PWML, 0);
@@ -215,22 +258,19 @@ void rotateBendUntilLineDetected(char a) {
   stopRobot();
 }
 
-void BlueLED(bool condition) {
-  if (condition) {
-    digitalWrite(BlueLED, HIGH);
-  } else {
-    digitalWrite(BlueLED, LOW);
-    
-  }
-  
 
-}
+
 void setup() {
   initializePins();
   Serial.begin(9600);
+
+  oledDisplay.begin(); 
+  oledDisplay.displayText("ElectroBots",1,0,0);  
 }
 
 void loop() {
+
+ 
   int sensors[8];
   readSensors(sensors);
 
@@ -244,21 +284,23 @@ void loop() {
      return;
    }
 
-  if (analogRead(leftIR)< sensorThresholds){
-     turnBend(0);
-     BlueLED(true);
-     delay(500);
-     BlueLED(false);
-     
-   }
+  // if (analogRead(leftIR)< sensorThresholds){   
+  //    turnBend(0); // left bend
+  //  }
 
-  if (analogRead(rightIR)< sensorThresholds){
-     turnBend(1);
-     BlueLED(true);
-     delay(500);
-     BlueLED(false);
-   }
+  // if (analogRead(rightIR)< sensorThresholds){
+  //    turnBend(1);  //right bend 
+  //  }
 
+  // // char bendDirection = detectBend();
+  // // if (bendDirection == 'r' || bendDirection == 'l') {
+  // //   rotateBendUntilLineDetected(bendDirection);  // Rotate robot until line is detected
+  // // } else {
+  // //   processLineFollowing(sen);
+  // // }
+  
+  // // delay(10);
   processLineFollowing(sen);
+  // delay(10);
 }
 

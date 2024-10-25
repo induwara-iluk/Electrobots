@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../line"
+		},
+		{
+			"name": "robot",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
