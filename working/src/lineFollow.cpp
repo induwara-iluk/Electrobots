@@ -1,38 +1,14 @@
 #include <Arduino.h>
 #include <lineFollow.h>
-void setMotorSpeed(int leftSpeed, int rightSpeed) {
-  leftSpeed = constrain(leftSpeed, -255, 255);
-  rightSpeed = constrain(rightSpeed, -255, 255);
-  
-  // Left motor control
-  if (leftSpeed < 0) {
-    analogWrite(PWML, -leftSpeed);  // Convert negative speed to positive for PWM
-    digitalWrite(FL, LOW);          // Set direction to backward
-    digitalWrite(B_L, HIGH);        // Set backward pin HIGH
-  } else {
-    analogWrite(PWML, leftSpeed);   // Apply speed for forward motion
-    digitalWrite(FL, HIGH);         // Set direction to forward
-    digitalWrite(B_L, LOW);         // Set backward pin LOW
-  }
-  
-  // Right motor control
-  if (rightSpeed < 0) {
-    analogWrite(PWMR, -rightSpeed); // Convert negative speed to positive for PWM
-    digitalWrite(FR, LOW);          // Set direction to backward
-    digitalWrite(B_R, HIGH);        // Set backward pin HIGH
-  } else {
-    analogWrite(PWMR, rightSpeed);  // Apply speed for forward motion
-    digitalWrite(FR, HIGH);         // Set direction to forward
-    digitalWrite(B_R, LOW);         // Set backward pin LOW
-  }
-}
+
+
 int calculatePosition(int sensors[]) {
   int sum = 0;
   int weightedSum = 0;
   
   sum = sensors[0] + sensors[1] + sensors[2] + sensors[3] + sensors[4] + sensors[5] + sensors[6] + sensors[7];
-  weightedSum = (10 * sensors[0] + 7 * sensors[1] + 4 * sensors[2] + sensors[3]) - 
-                (10 * sensors[7] + 7 * sensors[6] + 4 * sensors[5] + sensors[4]);
+  weightedSum = (7 * sensors[0] + 5 * sensors[1] + 3 * sensors[2] + sensors[3]) - 
+                (7 * sensors[7] + 5 * sensors[6] + 3 * sensors[5] + sensors[4]);
 
   
 
@@ -57,7 +33,7 @@ void processLineFollowing(int sen[]) {
   int position = calculatePosition(sen);
   int error = position;  // Target position is 0 (center)
   
-  integral += error;
+  
   int derivative = error - lastError;
 
   int correction = Kp * error + Kd * derivative;
