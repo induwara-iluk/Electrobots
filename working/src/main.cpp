@@ -1,5 +1,5 @@
 #include <Arduino.h>
-
+#include <calibrate.h>
 #include <lineFollow.h>
 #include <oled.h>
 #include <TCSColorSensor.h>
@@ -327,7 +327,10 @@ void setup() {
 
   oledDisplay.begin(); 
   oledDisplay.displayText("ElectroBots",1,0,0);  
-  delay(200);
+
+  int sensorThresholds =  calibrate(sensors);
+  oledDisplay.displayText(String(sensorThresholds),1,0,20);
+  delay(2000);
 }
 
 
