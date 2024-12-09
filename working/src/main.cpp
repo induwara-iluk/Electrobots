@@ -223,7 +223,132 @@ void setup() {
   
   
 }
+void moveDistance(float distance, int speed) {
 
+    // Calculate the number of pulses required for the given distance
+    long pulses_needed = (distance / (PI * wheel_diameter)) * pulses_per_revolution;
+
+    // Reset pulse counts
+    R_encoder_ticks = 0;
+    L_encoder_ticks = 0;
+
+    
+    // Wait until the required pulses are counted
+    while (R_encoder_ticks < pulses_needed && L_encoder_ticks < pulses_needed) {
+      motor.setMotorSpeed(speed,speed);
+    }
+    motor.stopRobot();
+}
+
+    
+void turnBend(byte direction){
+
+  L_encoder_ticks = 0;
+  R_encoder_ticks = 0;
+
+  moveDistance(0.12 , 65);
+
+  L_encoder_ticks = 0;
+  R_encoder_ticks = 0;
+
+  // 0 = left , 1 = right
+  while (direction == 0){
+    oledDisplay.displayText("left turn",1,0,0);  
+    oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
+    motor.setMotorSpeed(-70,70);
+
+    if (R_encoder_ticks > 150 && L_encoder_ticks  >150){
+      L_encoder_ticks = 0;
+      R_encoder_ticks = 0;
+      return;
+    }
+  
+  }
+
+  while (direction == 1){
+    oledDisplay.displayText("right turn",1,0,0);  
+    oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
+    motor.setMotorSpeed(70,-70);
+    if (R_encoder_ticks > 150 && L_encoder_ticks  > 150){
+      L_encoder_ticks = 0;
+      R_encoder_ticks = 0;
+      return;
+    }
+    
+  }
+
+}
+
+int detectBend(){
+  if( binarySensors[0]&& binarySensors[11]){
+    return 2 ;
+  } 
+  if (binarySensors[0] || binarySensors[1] ) {
+    return 0;  // Left bend detected
+  } else if ( binarySensors[10] || binarySensors[11]) {  // Adjust indices as needed
+    return 1;  // Right bend detected
+  } else {
+    return -1; // No bend detected
+  }
+}
+
+
+void turnBendIR(byte direction){
+
+  motor.setMotorSpeed(baseSpeed,baseSpeed);
+  delay(200);
+  // 0 = left , 1 = right
+  while (direction == 0){
+    oledDisplay.displayText("left turn",1,0,0);  
+    motor.setMotorSpeed(-100,70);
+
+    if ((analogRead(A9) < sensorThresholds) && (analogRead(A10) < sensorThresholds )){
+      direction = -1;
+      motor.stopRobot();
+       return;
+     }
+  }
+
+  while (direction == 1){
+    oledDisplay.displayText("right turn",1,0,0);  
+
+    motor.setMotorSpeed(70,-100);
+    
+   if ((analogRead(A9) < sensorThresholds) && (analogRead(A10) < sensorThresholds)){
+       direction  = -1;
+        motor.stopRobot();
+       return;
+   }
+  }
+
+}
+
+void turn180left(){
+  L_encoder_ticks = 0;
+  R_encoder_ticks = 0;
+  while (true)
+  {
+    motor.setMotorSpeed(-70,70);
+    if (R_encoder_ticks > 310 && L_encoder_ticks  > 310){
+      motor.stopRobot();
+      return;
+  }
+}
+}
+
+
+void turn180right(){
+  L_encoder_ticks = 0;
+  R_encoder_ticks = 0;
+  while (true)
+  {
+    motor.setMotorSpeed(70,-70);
+    if (R_encoder_ticks > 290 && L_encoder_ticks  > 290){
+      motor.stopRobot();
+      return;
+  }
+}
+}
 
 void straightMove(int base_speed){
 
@@ -263,6 +388,7 @@ switch (stage) {
         break;
     // Add more cases as needed
     case 3:
+        // Code for case value3
       break;
     default:
         irReader.readSensors(sensors);
