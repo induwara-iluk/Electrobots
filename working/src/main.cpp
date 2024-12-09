@@ -15,7 +15,7 @@ VL53L0X tof;
 
 ServoController boxHandler;
 
-
+int stage = 1 ;
 
 TCSColorSensor colorSensor;
 oled oledDisplay;
@@ -254,6 +254,25 @@ void straightMove(int base_speed){
 
 void loop() {
 
+switch (stage) {
+    case 1:
+        // Code for case value1
+        break;
+    case 2:
+        // Code for case value2
+        break;
+    // Add more cases as needed
+    case 3:
+      break;
+    default:
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors); 
+
+
+        processLineFollowing(binarySensors);
+        break;
+}
+
 
 /*
 while (historyIndex < historySize) {
@@ -281,11 +300,7 @@ while (historyIndex < historySize) {
 */
 
 
-irReader.readSensors(sensors);
-irReader.convertSensorsToBinary(sensors, binarySensors); 
 
-
-processLineFollowing(binarySensors);
 
 
 
