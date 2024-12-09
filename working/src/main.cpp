@@ -3,66 +3,105 @@
 #include <lineFollow.h>
 #include <oled.h>
 #include <TCSColorSensor.h>
+#include <MotorControl.h>
+#include <readIR.h>
+#include <Arduino.h>
+#include <ServoController.h>
+#include <Wire.h>
+#include <VL53L0X.h>
+
+
+VL53L0X tof;
+
+ServoController boxHandler;
+
+
 
 TCSColorSensor colorSensor;
 oled oledDisplay;
+readIR irReader;
 
-int sensors[8];
-int sen[8];
 
-const int B_L = 8;
-const int FL = 9;
-const int PWML = 10;
+const int B_R = 10;
+const int FR = 9;
+const int PWMR = 8;
 
-const int B_R = 5;
-const int FR = 6;
-const int PWMR = 7;
+const int B_L = 11;
+const int FL = 12;
+const int PWML = 13;
+
+byte decoded_num = 0;
+
+
+MotorControl motor(PWML, FL, B_L, PWMR, FR, B_R);
+
+int sensors[12];
+int binarySensors[12];
 
 const int btn1 = 18;
 const int btn2 = 19;
 
 
-const int leftIR = A8;
-const int rightIR = A9;
+const int leftIR = A4;
+const int rightIR = A15;
 const int frontIR = A10;
 
 int lastError = 0;
 int integral = 0;
 
-float Kp = 2.8;   // Proportional gain
-float Ki = 0.0; // Integral gain
-float Kd = 1.5;  // Derivative gain
-int baseSpeed = 65 ;  // Base speed for the motors
+float Kp = 4.0;  
+float Ki = 0.0; 
+float Kd = 1.5;  
+
+
+// for straght line
+float p_gain = 1.2;   // Proportional gain
+float i_gain = 0.05;  // Integral gain
+float d_gain = 0.1;   // Derivative gain
+
+// PID variables
+float pid_error = 0;
+float pid_previous_error = 0;
+float pid_integral = 0;
+float pid_derivative = 0;
+
+int baseSpeed = 60 ;  // Base speed for the motors
 
 int stage = 1; 
-const int historySize = 10; // Size of the history buffer
-int senHistory[historySize][8]; // History array to store past sensor states
+const int historySize = 3500; // Size of the history buffer
+int senHistory[historySize]; // History array to store past sensor states
 int historyIndex = 0; // Current index for appending in the history array
 
-int sensorThresholds = 300; // Threshold to distinguish black and white
+
 
 const int R_encoder_A = 2;
 
 const int L_encoder_A = 3;
 
 
-
-
-// Variables for encoder counts
 volatile long R_encoder_ticks = 0;
 volatile long L_encoder_ticks = 0;
 
-const float wheel_diameter = 0.067; // Diameter of the wheels in meters (e.g., 6.5 cm)
+const float wheel_diameter = 0.067; // Diameter of the wheels in meters
 int pulses_per_revolution = 222;
 
 // Variables for speed calculation
 long previous_ticks_R = 0;
 long previous_ticks_L = 0;
 
+String irValues_str ="";
+
+int sensorThresholds = 200;
+
+bool entered_colour_sq = false;
+
+int left_bend_count = 0;
+int right_bend_count = 0;
+
 
 
 void initializePins() {
-  for (int i = A0; i <= A10; i++) {
+  for (int i = A0; i <= A15; i++) {
     pinMode(i, INPUT);
   }
   pinMode(btn1, INPUT_PULLUP);
@@ -70,12 +109,6 @@ void initializePins() {
   pinMode(R_encoder_A, INPUT);
   pinMode(L_encoder_A, INPUT);
 
-  pinMode(B_L, OUTPUT);
-  pinMode(FL, OUTPUT);
-  pinMode(B_R, OUTPUT);
-  pinMode(FR, OUTPUT);
-  pinMode(PWMR, OUTPUT);
-  pinMode(PWML, OUTPUT);
 }
 
 // Encoder counting functions
@@ -87,220 +120,8 @@ void countL() {
     L_encoder_ticks++;
 }
 
-
-void readSensors(int sensors[]) {
-  String irValues_str = "";
-  for (int i = 0; i < 8; i++) {
-    sensors[i] = analogRead(A0 + i);
-    Serial.print(sensors[i]);
-    Serial.print(" ");
-    irValues_str+= sensors[i];  
-    irValues_str+=" ";
-    
-  }
-  //oledDisplay.displayText(irValues_str,1,0,0);
-  Serial.print(analogRead(A8));
-  Serial.print(" ");
-  Serial.print(analogRead(A9));
- Serial.println("");
-}
-
-
-void setMotorSpeed(int leftSpeed, int rightSpeed) {
-  leftSpeed = constrain(leftSpeed, -255, 255);
-  rightSpeed = constrain(rightSpeed, -255, 255);
-  
-  // Left motor control
-  if (leftSpeed < 0) {
-    analogWrite(PWML, -leftSpeed);  // Convert negative speed to positive for PWM
-    digitalWrite(FL, LOW);          // Set direction to backward
-    digitalWrite(B_L, HIGH);        // Set backward pin HIGH
-  } else {
-    analogWrite(PWML, leftSpeed);   // Apply speed for forward motion
-    digitalWrite(FL, HIGH);         // Set direction to forward
-    digitalWrite(B_L, LOW);         // Set backward pin LOW
-  }
-  
-  // Right motor control
-  if (rightSpeed < 0) {
-    analogWrite(PWMR, -rightSpeed); // Convert negative speed to positive for PWM
-    digitalWrite(FR, LOW);          // Set direction to backward
-    digitalWrite(B_R, HIGH);        // Set backward pin HIGH
-  } else {
-    analogWrite(PWMR, rightSpeed);  // Apply speed for forward motion
-    digitalWrite(FR, HIGH);         // Set direction to forward
-    digitalWrite(B_R, LOW);         // Set backward pin LOW
-  }
-}
-
-void convertSensorsToBinary(int sensors[], int sen[]) {
-  for (int i = 0; i < 8; i++) {
-    sen[i] = (sensors[i] < sensorThresholds) ? 1 : 0;
-  }
-}
-
-void moveDistance(float distance) {
-
-    // Calculate the number of pulses required for the given distance
-    long pulses_needed = (distance / (PI * wheel_diameter)) * pulses_per_revolution;
-
-    // Reset pulse counts
-    R_encoder_ticks = 0;
-    L_encoder_ticks = 0;
-
-    
-    // Wait until the required pulses are counted
-    while (R_encoder_ticks < pulses_needed && L_encoder_ticks < pulses_needed) {
-      int sensors[8];
-      readSensors(sensors);
-
-      int sen[8];
-      convertSensorsToBinary(sensors, sen);
-      processLineFollowing(sen);
-    }
-}
-
-
-
-void turnBendIR(byte direction){
-  moveDistance(0.04);
-  // 0 = left , 1 = right
-  while (direction == 0){
-    oledDisplay.displayText("left turn",1,0,0);  
-   
-    setMotorSpeed(-100,70);
-
-    if ((analogRead(A3) < sensorThresholds) && (analogRead(A4) < sensorThresholds &&  colorSensor.getDetectedColor() == "Red" )){
-       return;
-     }
-  }
-
-  while (direction == 1){
-    oledDisplay.displayText("right turn",1,0,0);  
-
-    setMotorSpeed(70,-65);
-    
-   if ((analogRead(A3) < sensorThresholds) && (analogRead(A4) < sensorThresholds)){
-       return;
-   }
-  }
-
-}
-
-
-
-
-void turnBend(byte direction){
-
-  String colour_prv = colorSensor.getDetectedColor();
-  moveDistance(0.04);
-  if (analogRead(frontIR)< sensorThresholds){
-    oledDisplay.displayText("T bend or Cross",1,0,0); 
-    
-    return;
-  }
-
-  // 0 = left , 1 = right
-  while (direction == 0){
-    oledDisplay.displayText("left turn",1,0,0);  
-    oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
-    setMotorSpeed(-100,70);
-
-    if (R_encoder_ticks > 160 && L_encoder_ticks  > 90){
-      L_encoder_ticks = 0;
-      R_encoder_ticks = 0;
-      return;
-    }
-    // if ((analogRead(A3) < sensorThresholds) && (analogRead(A4) < sensorThresholds &&  colorSensor.getDetectedColor() == "Red" )){
-    //   return;
-    // }
-  }
-
-  while (direction == 1){
-    oledDisplay.displayText("right turn",1,0,0);  
-    oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
-    setMotorSpeed(70,-65);
-    if (R_encoder_ticks > 90 && L_encoder_ticks  > 110){
-      L_encoder_ticks = 0;
-      R_encoder_ticks = 0;
-      return;
-    }
-    // if ((analogRead(A3) < sensorThresholds) && (analogRead(A4) < sensorThresholds)){
-    //   return;
-    // }
-  }
-
-}
-
-
-
-void updateSensorHistory(int sen[]) {
-  for (int i = 0; i < 8; i++) {
-    senHistory[historyIndex][i] = sen[i];
-  }
-  historyIndex = (historyIndex + 1) % historySize; // Circular buffer
-}
-
-
-
-void stopRobot() {
-  analogWrite(PWML, 0);
-  analogWrite(PWMR, 0);
-
-  digitalWrite(FL, LOW);
-  digitalWrite(B_L, LOW);
-
-  digitalWrite(FR, LOW);
-  digitalWrite(B_R, LOW);
-  
-}
-
-int detectBend(){
-  if((!digitalRead(leftIR) || sen[0])&& (sen[7] || !digitalRead(rightIR))){
-    return 2 ;
-  } 
-  if (sen[0] && sen[1] && sen[2] && !digitalRead(leftIR)) {
-    return 0;  // Left bend detected
-  } else if (sen[7] && sen[6] && sen[5] && !digitalRead(rightIR)) {  // Adjust indices as needed
-    return 1;  // Right bend detected
-  } else {
-    return -1; // No bend detected
-  }
-}
-
-
-void turnTicks(int direction , int given_ticks = 265 ){
-  
-  
-    
-    if (direction == 1){
-      while(L_encoder_ticks < given_ticks)
-      {
-      setMotorSpeed(100,0);
-      }
-      stopRobot();
-      delay(100);
-      }
-    if(direction == 0){
-      while(R_encoder_ticks < given_ticks){
-      setMotorSpeed(0,100);
-      }
-      stopRobot();
-      delay(100);
-      }
-    if(direction == 2 ){
-      stopRobot();
-      delay(1000);
-    }
-    
-  
-      
-      
-  
-}
-
 void kUp() {
-    Kd -=0.1;
+    Kp +=0.1;   
 }
 
 void kDown() {
@@ -310,75 +131,244 @@ void kDown() {
 
 
 void setup() {
+
   initializePins();
+
+  boxHandler.attachGripper(4); // Attach the gripper servo to pin 9
+  boxHandler.attachArm(7);    // Attach the arm servo to pin 10
+
+
   Serial.begin(9600);
 
-  if (colorSensor.begin()) {
-    Serial.println("TCS34725 found");
-  } else {
-    Serial.println("No TCS34725 found ... check your connections");
+   if (!tof.init()) {
+    Serial.println("Failed to initialize VL53L0X sensor!");
     while (1);
   }
+
+
+  // if (colorSensor.begin()) {
+  //   Serial.println("TCS34725 found");
+  // } else {
+  //   Serial.println("No TCS34725 found ... check your connections");
+  //   while (1);
+  // }
   attachInterrupt(digitalPinToInterrupt(btn1), kUp, FALLING);
   attachInterrupt(digitalPinToInterrupt(btn2), kDown, FALLING);
 
   attachInterrupt(digitalPinToInterrupt(R_encoder_A), countR, RISING);
   attachInterrupt(digitalPinToInterrupt(L_encoder_A), countL, RISING);
 
-  oledDisplay.begin(); 
-  oledDisplay.displayText("ElectroBots",1,0,0);  
 
-  int sensorThresholds =  calibrate(sensors);
-  oledDisplay.displayText(String(sensorThresholds),1,0,20);
+ 
+  oledDisplay.begin(); 
+  oledDisplay.displayText("ElectroBots",1.5,0,0);  
+
+  // int sensorThresholds =  calibrate(sensors);
+  //oledDisplay.displayText(String(sensorThresholds),1,0,20);
   delay(2000);
+
+
+  
+/*
+  while (decoded_num == -1)
+  {
+    //read barcode
+
+
+  }
+
+  while (entered_colour_sq == false)
+  { 
+    int direction = detectBend();
+    
+
+    if(decoded_num == 0){
+      while (left_bend_count < 2)
+      {
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+        direction = detectBend();
+        processLineFollowing(binarySensors);
+      }
+      motor.stopRobot();
+      direction = -1;
+      //turn on led
+      
+      while (direction != 1)
+      {
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+        direction = detectBend();
+        processLineFollowing(binarySensors);
+      }
+      motor.stopRobot();
+      //turn off led
+      turn180();
+      motor.stopRobot();
+      
+      //L_encoder_ticks=0;
+      //R_encoder_ticks=0;
+      
+      entered_colour_sq = true;
+      
+      
+    }
+
+
+      
+    
+  }   
+  
+*/
+  
+  
+}
+
+
+void straightMove(int base_speed){
+
+  // Calculate error (difference between encoder counts)
+  pid_error = L_encoder_ticks - R_encoder_ticks;
+
+  pid_derivative = pid_error - pid_previous_error;
+
+  // PID output (correction factor)
+  float correction = (p_gain * pid_error) + (d_gain * pid_derivative);
+
+  // Adjust motor speeds
+  int left_speed = base_speed + correction;
+  int right_speed = base_speed - correction;
+
+  // Constrain motor speeds to valid range
+  left_speed = constrain(left_speed, 0, 255);
+  right_speed = constrain(right_speed, 0, 255);
+
+  // Set the motor speeds
+  motor.setMotorSpeed(left_speed, right_speed);
+
+
+  pid_previous_error = pid_error;
+
 }
 
 
 void loop() {
 
-  //oledDisplay.displayText("Kp :" + String(Kp) + "    Kd :" + String(Kd) ,1,0,30);
 
+/*
+while (historyIndex < historySize) {
+    straightMove(60);
+    // Read sensors
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+
+    // Calculate the sum of binary sensors
+    int sum = 0;
+    for (int i = 0; i < 12; i++) {
+        sum += binarySensors[i];
+    }
+
+    // Update sensor history based on the sum
+    if (binarySensors[5] == 1) {
+        senHistory[historyIndex] = 1; // White line
+    }  else {
+        senHistory[historyIndex] = 0; // Black line
+    }
+
+
+    historyIndex++;
+}
+*/
+
+
+irReader.readSensors(sensors);
+irReader.convertSensorsToBinary(sensors, binarySensors); 
+
+
+processLineFollowing(binarySensors);
+
+
+
+
+  // uint16_t distance = tof.readRangeSingleMillimeters();
+
+  // if (tof.timeoutOccurred()) {
+  //   oledDisplay.displayText("Sensor timeout!");
+  // } else {
+  //   //oledDisplay.displayText("Distance: " + String(distance) + " mm");
+  // }
+  // irReader.readSensors(sensors);
+  // irReader.convertSensorsToBinary(sensors, binarySensors);
+
+  // processLineFollowing(binarySensors);
   
+  // if (distance<30){
+   
+  //   motor.stopRobot();
+  //   moveDistance(0.05,50);
+  //   boxHandler.grabBox();
+  //   boxHandler.liftBox();
+  //   turn180left();
+  //   boxHandler.lowerArm();
+  //    boxHandler.releaseBox();
+  //   while (true)
+  //   {
+      
+  //   }
+    
+
+  // }
 
  // oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50);
   
-
   //colorSensor.readColor();
   //oledDisplay.displayText(colorSensor.getDetectedColor(),1,0,20);
- 
-  readSensors(sensors);
-  convertSensorsToBinary(sensors, sen);
+  //readSensors(sensors);
   // updateSensorHistory(sen); // Update sensor history
-
-  if (allSensorsDetectBlack(sensors)) {
-     stopRobot();
-     return;
-   }  
- /*
-
-  if (analogRead(leftIR)< sensorThresholds && analogRead(rightIR)> sensorThresholds ){   
-      L_encoder_ticks = 0;
-      R_encoder_ticks = 0;
-      turnBendIR(0); // left bend
-    }
-
-  if (analogRead(rightIR)< sensorThresholds && analogRead(leftIR)> sensorThresholds){
-      L_encoder_ticks = 0;
-      R_encoder_ticks = 0;
-      turnBendIR(1);  //right bend 
-    }
-
-
-  */
   
   
-   int direction = detectBend();
-   oledDisplay.displayText(String(direction));
-   L_encoder_ticks=0;
-   R_encoder_ticks=0;
-  turnTicks(direction);
-  processLineFollowing(sen);
+
+  // oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
+
 
   
+
+  // int direction = detectBend();
+
+ // if (allSensorsDetectBlack(binarySensors) && direction == -1 ) {
+   // motor.stopRobot();
+ // }  
+
+
+ 
+  // boxHandler.grabBox();    // Grab the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.liftBox();    // Lift the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.lowerArm();   // Lower the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.releaseBox(); // Release the box
+  // delay(2000);  
+
+  
+
+
+  // if (direction == 0 || direction == 1 ){
+  //   turnBend(direction);
+  // }
+  // else{
+  //    processLineFollowing(binarySensors);
+  // }
+
+
+
+
+  // for (int i = 0; i < historySize; i++) {
+  //   Serial.print("Element ");
+  //   Serial.print(i);
+  //   Serial.print(": ");
+  //   Serial.println(senHistory[i]); // Print each element on a new line
+  //}
 }
+
 
