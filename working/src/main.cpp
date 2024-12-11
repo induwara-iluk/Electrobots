@@ -11,11 +11,15 @@
 #include <VL53L0X.h>
 
 
-VL53L0X tof;
+#define XSHUT_PIN_1 A15
+#define XSHUT_PIN_2 A13
+#define XSHUT_PIN_3 A11
+
 
 ServoController boxHandler;
 
 int stage = 1 ;
+int testCount = 0 ;
 
 TCSColorSensor colorSensor;
 oled oledDisplay;
@@ -40,7 +44,7 @@ int binarySensors[12];
 
 const int btn1 = 18;
 const int btn2 = 19;
-
+const int LEDpin= 5 ;
 
 const int leftIR = A4;
 const int rightIR = A15;
@@ -67,10 +71,11 @@ float pid_derivative = 0;
 
 int baseSpeed = 60 ;  // Base speed for the motors
 
-int stage = 1; 
-const int historySize = 3500; // Size of the history buffer
+const int historySize = 200; // Size of the history buffer
 int senHistory[historySize]; // History array to store past sensor states
 int historyIndex = 0; // Current index for appending in the history array
+int barcode = 0  ;
+int outputArray[13] = {0};
 
 
 
@@ -97,6 +102,8 @@ bool entered_colour_sq = false;
 
 int left_bend_count = 0;
 int right_bend_count = 0;
+
+
 
 
 
@@ -134,17 +141,14 @@ void setup() {
 
   initializePins();
 
+  
+
+
   boxHandler.attachGripper(4); // Attach the gripper servo to pin 9
   boxHandler.attachArm(7);    // Attach the arm servo to pin 10
 
 
   Serial.begin(9600);
-
-   if (!tof.init()) {
-    Serial.println("Failed to initialize VL53L0X sensor!");
-    while (1);
-  }
-
 
   // if (colorSensor.begin()) {
   //   Serial.println("TCS34725 found");
@@ -215,14 +219,22 @@ void setup() {
     }
 
 
-      
+*/    
     
   }   
   
-*/
-  
-  
+
+void LED(int status){
+
+  if(status){
+    digitalWrite(LEDpin,HIGH);
+
+  }else{
+    digitalWrite(LEDpin,LOW);
+  }
 }
+  
+
 void moveDistance(float distance, int speed) {
 
     // Calculate the number of pulses required for the given distance
@@ -350,6 +362,7 @@ void turn180right(){
 }
 }
 
+
 void straightMove(int base_speed){
 
   // Calculate error (difference between encoder counts)
@@ -375,34 +388,56 @@ void straightMove(int base_speed){
   pid_previous_error = pid_error;
 
 }
+int moveTilBend(){
+  int bendDirection = -1 ;
+  while( bendDirection == -1){
+    bendDirection = detectBend() ;
+    processLineFollowing(binarySensors);
+  }
+  return bendDirection ; 
+}
+
+
+int processSensorHistory(int senHistory[]) {
+  int barcodeNumber = 0 ; 
+  int outCount = 0 ;
+  int consecutiveCount = 0;
+  for (int i = 0; i < historySize; i++) {
+    if (senHistory[i] == 1) {
+      consecutiveCount++;
+    } else {
+      if(consecutiveCount >2 && consecutiveCount < 6){
+        outputArray[outCount] = 0;
+        outCount++;
+      }else if(consecutiveCount > 7){
+        outputArray[outCount] = 1;
+        outCount++;
+      }
+        consecutiveCount = 0;
+      }
+      
+      
+  }
+
+  for (int k = 0 ; k < 9 ; k++){
+    Serial.print(outputArray[k]);
+    barcodeNumber = barcodeNumber + outputArray[k] * (1 << (8 - k));
+
+    
+  }
+  return barcodeNumber ;
+
+}
+
 
 
 void loop() {
 
 switch (stage) {
     case 1:
-        // Code for case value1
-        break;
-    case 2:
-        // Code for case value2
-        break;
-    // Add more cases as needed
-    case 3:
-        // Code for case value3
-      break;
-    default:
-        irReader.readSensors(sensors);
-        irReader.convertSensorsToBinary(sensors, binarySensors); 
-
-
-        processLineFollowing(binarySensors);
-        break;
-}
-
-
-/*
-while (historyIndex < historySize) {
+    while (historyIndex < historySize) {
     straightMove(60);
+    delay(50);
     // Read sensors
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
@@ -414,16 +449,41 @@ while (historyIndex < historySize) {
     }
 
     // Update sensor history based on the sum
-    if (binarySensors[5] == 1) {
+    if (sum > 8) {
         senHistory[historyIndex] = 1; // White line
     }  else {
-        senHistory[historyIndex] = 0; // Black line
+      senHistory[historyIndex] = 0;
     }
+    Serial.print(senHistory[historyIndex]);
+    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1) ) {
+    testCount = testCount+1 ;
+  }else{
+    testCount = 0 ;
+  }
 
+    if (testCount > 6 ){
+      motor.stopRobot();
+      delay(1000);
+      historyIndex = historySize+1 ;
+      break;
+    }
 
     historyIndex++;
 }
-*/
+barcode = processSensorHistory(senHistory);
+oledDisplay.displayText(String(barcode));
+stage = 2; 
+        break;
+    case 2:
+        irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors);
+
+        break;
+    // Add more cases as needed
+    case 3:
+        break;
+}
 
 
 
@@ -511,5 +571,4 @@ while (historyIndex < historySize) {
   //   Serial.println(senHistory[i]); // Print each element on a new line
   //}
 }
-
 
