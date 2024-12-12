@@ -1,5 +1,7 @@
+#include <Arduino.h>
 #include <lineFollow.h>
 #include <MotorControl.h>
+
 
 
 int calculatePosition(int sensors[]) {

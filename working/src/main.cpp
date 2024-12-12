@@ -9,12 +9,12 @@
 #include <ServoController.h>
 #include <Wire.h>
 
-#include "VL53L0X_MultiSensor.h"
+
 
 int xshutPins[] = {49, 47, 45, 43};
 uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
 
-VL53L0X_MultiSensor multiSensor(xshutPins, i2cAddresses, 4);
+
 
 ServoController boxHandler;
 
@@ -104,7 +104,7 @@ int right_bend_count = 0;
 
 // variables for task 6
 
-int places[3] = {0,0,0};
+int places[3] = {3,1,2};
 
 bool place_count = 0;
 
@@ -134,39 +134,19 @@ int* definepath(int x, int y) {
     return myarray[sub_place + 2]; // Return pointer to the path array
 }
 
-bool checkbox(){
-  multiSensor.readDistances();
-  int* sensorDistances = multiSensor.getDistances();
-  int distanceFront = sensorDistances[0];
+int backpath_1[4] = { 0, 5, 9,9};
+int backpath_2[4] = { -1, 1, 5,9};
+int backpath_3[4] = { -1, 0, 1,9};
+int backpath_4[4] = { 1, -1, 5,9};
+int backpath_5[4] = { 1, 0, -1,9};
 
-  if (distanceFront < 40){
-    return true;
-  }
-  else{
-    return false;
-  }
+int* backarray[5] = {backpath_5,backpath_4,backpath_1,backpath_2,backpath_1};
 
+int* backpath(int a,int b) {
+  int sub_place = a-b;
+  return backarray[sub_place + 2];
 }
 
-int checkboxheight(){
-  multiSensor.readDistances();
-  int* sensorDistances = multiSensor.getDistances();
-  int distancebottom = sensorDistances[1];
-  int distancemiddle = sensorDistances[2];
-  int distancetop = sensorDistances[3];
-
-  if(distancebottom < 400 && distancemiddle < 400 && distancetop < 400){
-    return 3;
-  }else if(distancebottom < 400 && distancemiddle < 400 && distancetop > 400){
-    return 2 ;
-  }else if(distancebottom < 400 && distancemiddle > 400 && distancetop > 400){
-    return 1;
-  }else if(distancebottom > 400 && distancemiddle > 400 && distancetop > 400){
-    return 0;
-  }
-
-
-}
 
 
 
@@ -223,7 +203,7 @@ void setup() {
 
   initializePins();
 
-  multiSensor.begin();
+ 
 
   boxHandler.attachGripper(4); // Attach the gripper servo to pin 9
   boxHandler.attachArm(7);    // Attach the arm servo to pin 10
@@ -440,7 +420,7 @@ void turn180right(){
   while (true)
   {
     motor.setMotorSpeed(70,-70);
-    if (R_encoder_ticks > 290 && L_encoder_ticks  > 290){
+    if (R_encoder_ticks > 300 && L_encoder_ticks  > 300){
       motor.stopRobot();
       return;
   }
@@ -477,17 +457,7 @@ void straightMove(int base_speed){
 void loop() {
     switch (stage) {
         case 1:
-            multiSensor.readDistances();
-            int* sensorDistances = multiSensor.getDistances();
-
-            int distanceFront = sensorDistances[0];
-            int distanceBottom = sensorDistances[1];
-            int distanceMiddle = sensorDistances[2];
-            int distanceTop = sensorDistances[3];
-
-
-            oledDisplay.displayText("Front : "+ String(distanceFront) + " " +"Bottom : " +String(distanceBottom) + " "+"Middle :" + String(distanceMiddle) + "  Top :" + String(distanceTop),1,0,0);
-            break; // Add break to exit the switch case
+            break;
 
         case 2:
             // Code for case value2
@@ -498,8 +468,10 @@ void loop() {
            
 
             while (true) {
-                oledDisplay.displayText("Stage 3" + String(boxcount),1,0,0);
-                // Read and process sensor data
+
+                oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
+                oledDisplay.displayText("stage 3 " + String(instruction[currentInstructionIndex]),1,0,30);
+                oledDisplay.displayText("aneem " + String(currentInstructionIndex ),1,0,50);
                 irReader.readSensors(sensors);
                 irReader.convertSensorsToBinary(sensors, binarySensors);
 
@@ -511,24 +483,20 @@ void loop() {
                         currentInstructionIndex = 0;
 
                       // Update the instruction array
-                      int* newInstructions = definepath(places[boxcount],boxcount);
+                      int* newInstructions = definepath(boxcount, places[boxcount-1]);
                       for (int i = 0; i < 4; i++) {
                           instruction[i] = newInstructions[i];
                       }
 
-    // Update the instruction count
-    instructionCount = sizes[places[boxcount]-1][boxcount-1];
+                      // Update the instruction count
+                      instructionCount = sizes[boxcount-1][places[boxcount]-1];
 
-    // Wait for 0.5 seconds
-    delay(500);
+                      oledDisplay.displayText(" count" + String(instructionCount),1,0,0);
+                      delay(2000);
+
+                    break;
                 }
-
-                // Check if a junction or bend is detected
-                if (junctionDetected(binarySensors) || instruction[0] == 2) {
-                    motor.stopRobot();
-                    delay(500); // Wait for 0.5 seconds
-
-                    if (currentInstructionIndex == instructionCount && allSensorsDetectwhite(sensors)) {
+                if (currentInstructionIndex >= instructionCount && allSensorsDetectwhite(sensors)) {
                         motor.stopRobot();
                         delay(1000);
                         boxHandler.lowerArm();
@@ -536,39 +504,62 @@ void loop() {
                         moveDistance(0.04, -65);
                         turn180right();
                         moveDistance(0.04, -65);
+                        delay(1000);
+
+                        int* new_instruction = backpath(boxcount+1,places[boxcount-1]);
+                        instructionCount =sizes[places[boxcount-1]-1][boxcount-1];
+                        currentInstructionIndex = 0;
+                        oledDisplay.displayText("back " + String(currentInstructionIndex),1,0,0);
+                        oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
+                        delay(2000);
                         boxcount++;
+
+
+
                         break; // Exit the loop
                     }
+
+                // Check if a junction or bend is detected
+                if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2   ) {
+                    
+                    motor.stopRobot();
+                    delay(500); // Wait for 0.5 seconds
 
                     // Process the current instruction based on the instruction array
                     switch (instruction[currentInstructionIndex]) {
                         case 2:
-                            currentInstructionIndex++;
+
+                            
                             boxHandler.grabBox();
                             boxHandler.liftBox();
                             moveDistance(0.04, -65);
-                            turn180left();
+                            turn180right();
                             moveDistance(0.04, -65);
+                            oledDisplay.displayText("hiiii " + String(currentInstructionIndex),1,0,20);
+                            
                             break;
                         case -1:
                             // Turn left
-                            currentInstructionIndex++;
+                            moveDistance(0.01,65);
                             turnBend(0);
                             break;
                         case 0:
                             // Go straight
-                            currentInstructionIndex++;
+                            
                             moveDistance(0.06, 65);
                             break;
                         case 1:
                             // Turn right
-                            currentInstructionIndex++;
+                            moveDistance(0.01,65);
                             turnBend(1);
+
+                            
                             break;
                         default:
-                            motor.stopRobot();
+                            processLineFollowing(binarySensors);
                             break;
                     }
+                    currentInstructionIndex++;
                 } else {
                     // Process line-following logic when no junction or bend is detected
                     processLineFollowing(binarySensors);
