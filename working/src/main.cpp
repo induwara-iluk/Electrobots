@@ -499,6 +499,7 @@ switch (stage) {
     case 1:
     LED(0);
     decodeBarcode();
+
         break;
     case 2:
     while (fisrtBendDetected == false){
@@ -527,11 +528,7 @@ switch (stage) {
         break;
     // Add more cases as needed
     case 3:
-    irReader.setColour(1);
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-        processLineFollowing(binarySensors);
-        break;
+    break;
     case 5 :
     break;
 
