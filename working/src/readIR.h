@@ -3,16 +3,21 @@
 
 #include <Arduino.h>
 
+// Declare irValues_str as an extern global variable
+extern String irValues_str;
+
 class readIR {
 public:
-    
+    // Public methods
     void readSensors(int sensors[]);
     void convertSensorsToBinary(int sensors[], int sen[]);
 
-private:
-    
-};
+    // Method to set the colour value
+    void setColour(int value);
 
-extern String irValues_str;;
+private:
+    // Private member variable for colour
+    int colour = 0;
+};
 
 #endif
