@@ -18,8 +18,9 @@
 
 ServoController boxHandler;
 
-int stage = 1 ;
+int stage = 3 ;
 int testCount = 0 ;
+int colour;
 
 TCSColorSensor colorSensor;
 oled oledDisplay;
@@ -432,9 +433,12 @@ int processSensorHistory(int senHistory[]) {
 
 
 void loop() {
-
+oledDisplay.displayText(String(stage),1.5,0,0);
 switch (stage) {
     case 1:
+    colour = 0 ;
+    irReader.setColour(colour);
+
     while (historyIndex < historySize) {
     straightMove(60);
     delay(50);
@@ -455,7 +459,7 @@ switch (stage) {
       senHistory[historyIndex] = 0;
     }
     Serial.print(senHistory[historyIndex]);
-    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1) ) {
+    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1) ) {
     testCount = testCount+1 ;
   }else{
     testCount = 0 ;
@@ -463,18 +467,22 @@ switch (stage) {
 
     if (testCount > 6 ){
       motor.stopRobot();
-      delay(1000);
+      delay(5000);
       historyIndex = historySize+1 ;
       break;
     }
 
     historyIndex++;
 }
+motor.stopRobot();
+      delay(5000);
 barcode = processSensorHistory(senHistory);
 oledDisplay.displayText(String(barcode));
+irReader.setColour(1);
 stage = 2; 
         break;
     case 2:
+        
         irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
         processLineFollowing(binarySensors);
@@ -482,6 +490,10 @@ stage = 2;
         break;
     // Add more cases as needed
     case 3:
+    irReader.setColour(1);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors);
         break;
 }
 
@@ -571,4 +583,3 @@ stage = 2;
   //   Serial.println(senHistory[i]); // Print each element on a new line
   //}
 }
-
