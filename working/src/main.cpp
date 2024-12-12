@@ -18,7 +18,7 @@
 
 ServoController boxHandler;
 
-int stage = 3 ;
+int stage = 5 ;
 int testCount = 0 ;
 int colour;
 
@@ -495,6 +495,36 @@ stage = 2;
     irReader.convertSensorsToBinary(sensors, binarySensors);
         processLineFollowing(binarySensors);
         break;
+    case 5 :
+
+    while(binarySensors[0] == 0 && binarySensors[11]==0){
+      irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors); 
+        }
+        motor.stopRobot();
+        delay(1000);
+        while(binarySensors[0] != 0 && binarySensors[11]!=0){
+      irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors); 
+        }
+        
+        stage = 6 ;
+       
+        break;
+    case 6 : 
+    irReader.setColour(1);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    processLineFollowing(binarySensors); 
+
+    break;
+    
+
+
 }
 
 
