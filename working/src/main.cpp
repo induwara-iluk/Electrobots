@@ -22,7 +22,15 @@ uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
 
 ServoController boxHandler;
 
-int stage = 1 ;
+//////////////////////////////
+// stage handler 
+
+#define switch1 33
+#define switch2 35
+#define switch3 37
+#define switch4 39
+
+int stage = 2 ;
 int testCount = 0 ;
 int colour;
 
@@ -47,18 +55,6 @@ MotorControl motor(PWML, FL, B_L, PWMR, FR, B_R);
 
 int sensors[12];
 int binarySensors[12];
-
-int VInstructions[5][6] ={{0,0,0,0,0,0},{0,1,0,0,0,0},{0,0,0,0,0,0},{0,1,0,0,0,0},{1,0,1,0,0,0}}; 
-
-/*
-0-move forwarad
-1- turn right
--1-turn left 
-2 - turn on the bulb 
--2 -turn off the bulb
- 
-
-*/
 
 const int btn1 = 18;
 const int btn2 = 19;
@@ -89,7 +85,7 @@ float pid_derivative = 0;
 
 int baseSpeed = 65 ;  // Base speed for the motors
 
-const int historySize = 200; // Size of the history buffer
+const int historySize = 180; // Size of the history buffer
 int senHistory[historySize]; // History array to store past sensor states
 int historyIndex = 0; // Current index for appending in the history array
 int barcode = 0  ;
@@ -120,6 +116,27 @@ bool entered_colour_sq = false;
 
 int left_bend_count = 0;
 int right_bend_count = 0;
+/////////////////////////////////////
+// variables for task 2 
+
+int VirtualInstructions0a[14] = {1,2,3,-1,-1,-1,4,3,-1,-1,-1,2,5,6} ;
+int VirtualInstructions0b[14] = {1,2,3,-1,-1,-1,4,7,7,3,-1,-1,-1,2,5,6} ;
+
+
+int VirtualInstructions1a[13] = {8,1,1,1,4,7,3} ;
+int VirtualInstructions3b[13] = {8,1,1,1,4,7,3} ;
+
+int VirtualInstructions13[13] = {1,1,2,7,3} ;
+int VirtualInstructions23[13] = {1,1,7,,2,3} ;
+int VirtualInstructions43[13] = {1,1,7,7,7,7,4,3,-1,-1,7,-1,-1} ;
+
+int VirtualInstructions21[13] = {1,1,7,4,3} ;
+int VirtualInstructions31[13] = {1,1,7,7,4,3} ;
+int VirtualInstructions41[13] = {1,1,7,7,7,7,4,3} ;
+int VirCount = 0 ;
+
+
+
 
 
 // variables for task 6
@@ -197,6 +214,11 @@ void initializePins() {
   pinMode(btn2, INPUT_PULLUP);
   pinMode(R_encoder_A, INPUT);
   pinMode(L_encoder_A, INPUT);
+  pinMode(LEDpin,OUTPUT);
+  pinMode(switch1,INPUT_PULLUP);
+  pinMode(switch2,INPUT_PULLUP);
+  pinMode(switch3,INPUT_PULLUP);
+  pinMode(switch4,INPUT_PULLUP);
 
 }
 
@@ -229,10 +251,6 @@ void setup() {
 
   Serial.begin(9600);
 
-   if (!tof.init()) {
-    Serial.println("Failed to initialize VL53L0X sensor!");
-    while (1);
-  }
 
 
   // if (colorSensor.begin()) {
@@ -250,7 +268,14 @@ void setup() {
 
  
   oledDisplay.begin(); 
-  oledDisplay.displayText("ElectroBots",1.5,0,0);  
+  int value1 = digitalRead(switch1);
+  int value2 = digitalRead(switch2);
+  int value3 = digitalRead(switch3);
+  int value4 = digitalRead(switch4);
+
+  stage = value1*1 + value2*2 + value3*3 +value4*4;
+
+  oledDisplay.displayText("Stage : " + String(stage),1.5,0,0);
 
   // int sensorThresholds =  calibrate(sensors);
   //oledDisplay.displayText(String(sensorThresholds),1,0,20);
@@ -354,7 +379,7 @@ void turnBend(byte direction){
     oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
     motor.setMotorSpeed(-70,70);
 
-    if (R_encoder_ticks > 130 && L_encoder_ticks  >130){
+    if (R_encoder_ticks > 140 && L_encoder_ticks  >140){
       L_encoder_ticks = 0;
       R_encoder_ticks = 0;
       return;
@@ -377,7 +402,7 @@ void turnBend(byte direction){
 }
 
 bool junctionDetected(int binarySensors[]) {
-  if ((binarySensors[0 ] && binarySensors[11])|| (binarySensors[0] || binarySensors[1]) || (binarySensors[10] || binarySensors[11])) {
+  if ((binarySensors[0]&&binarySensors[1])||((binarySensors[11]&&binarySensors[10]))) {
     return true;
   } else {  
     return false;
@@ -528,18 +553,129 @@ void decodeBarcode(){
     irReader.setColour(colour);
 
     while (historyIndex < historySize) {
+    straightMove(60);
+    delay(50);
+    // Read sensors
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
 
+    // Calculate the sum of binary sensors
+    int sum = 0;
+    for (int i = 0; i < 12; i++) {
+        sum += binarySensors[i];
+    }
+
+    // Update sensor history based on the sum
+    if (sum > 8) {
+        senHistory[historyIndex] = 1; // White line
+    }  else {
+      senHistory[historyIndex] = 0;
+    }
+    Serial.print(senHistory[historyIndex]);
+    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1) ) {
+    testCount = testCount+1 ;
+  }else{
+    testCount = 0 ;
+  }
+
+    if (testCount > 6 ){
+      motor.stopRobot();
+      delay(1000);
+      historyIndex = historySize+1 ;
+      break;
+    }
+
+    historyIndex++;
+}
+motor.stopRobot();
+      delay(1000);
+barcode = processSensorHistory(senHistory);
+oledDisplay.displayText(String(barcode));
+delay(1000);
+irReader.setColour(0);
+stage = 2; 
+}
 
 void loop() {
     switch (stage) {
+      case 0 :
+
+      break;
+
         case 1:
-            break;
+    decodeBarcode();
 
-        case 2:
-            // Code for case value2
-            break;
+        break;
 
-        // Add more cases as needed
+        // stage 2 
+    case 2:
+      while(true){
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+
+        if(junctionDetected( binarySensors)){
+          motor.stopRobot();
+          //oledDisplay.displayText("junction detected" + String(VirtualInstructions[VirCount]),1,0,0);
+          oledDisplay.displayText("Vir count"+ String(VirCount),1,0,0);
+          motor.stopRobot();
+          delay(1000);
+          switch(VirtualInstructions3b[VirCount]){
+            case 2:
+            LED(1);
+            moveDistance(0.04,65);
+            break;
+            case 3:
+            moveDistance(0.04,65);
+            LED(0);
+            moveDistance(0.04,-65);
+            turn180right();
+            moveDistance(0.05,-65);
+            break;
+            case -1 :
+            moveDistance(0.03,65);
+            turnBend(0);
+            moveDistance(0.03,-65);
+            break;
+            case 1:
+            moveDistance(0.03,65);
+            turnBend(1);
+            moveDistance(0.03,-65);
+            break;
+            case 4 :
+            moveDistance(0.03,-65);
+            turn180right();
+            moveDistance(0.17,-65);
+            LED(1);
+            moveDistance(0.04,65);
+            break;
+            case 5:
+            moveDistance(0.03,65);
+            LED(1);
+            moveDistance(0.04,65);
+            break;
+            case 6:
+            moveDistance(0.03,65);
+            LED(0);
+            motor.stopRobot();
+            break;
+            case 7:
+            moveDistance(0.08,65);
+            break;
+            case 8 :
+            turn180right();
+            break;
+          }
+          motor.stopRobot();
+          delay(1000);
+          VirCount ++ ;
+        }else{
+            processLineFollowing(binarySensors);
+        }
+
+
+      }
+
+
         case 3:
            
 
@@ -648,9 +784,38 @@ void loop() {
             irReader.convertSensorsToBinary(sensors, binarySensors);
             processLineFollowing(binarySensors);
             break;
-    }
-}
+    
 
+    case 5 :
+    
+
+    while(binarySensors[0] == 0 && binarySensors[11]==0){
+      irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors); 
+        }
+        motor.stopRobot();
+        delay(1000);
+        while(binarySensors[0] != 0 && binarySensors[11]!=0){
+      irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors); 
+        }
+
+        stage = 6 ;
+       
+        break;
+    case 6 : 
+    irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    processLineFollowing(binarySensors); 
+
+    break;
+}
+}
 /*
 while (historyIndex < historySize) {
     straightMove(60);
@@ -853,5 +1018,5 @@ switch (stage) {
   //   Serial.println(senHistory[i]); // Print each element on a new line
   //}
 }
-
+*/
 
