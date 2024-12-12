@@ -44,7 +44,7 @@ MotorControl motor(PWML, FL, B_L, PWMR, FR, B_R);
 int sensors[12];
 int binarySensors[12];
 
-int VInstructions[5][6] ={{0,0,0,0,0,0},{0,1,0,0,0,0},{0,0,0,0,0,0},{0,1,0,0,0,0},{0,0,0,0,0,0}}; 
+int VInstructions[5][6] ={{0,0,0,0,0,0},{0,1,0,0,0,0},{0,0,0,0,0,0},{0,1,0,0,0,0},{1,0,1,0,0,0}}; 
 
 /*
 0-move forwarad
@@ -506,7 +506,7 @@ switch (stage) {
       irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
         processLineFollowing(binarySensors);
-        if(detectBend() != 0){
+        if(detectBend() != -1){
           fisrtBendDetected = true ;
           }
     }
@@ -519,10 +519,10 @@ switch (stage) {
           }
     break;
     case 1 :
-    turnBend(0);
+    turnBend(1);
     break ;
     case -1 :
-    turnBend(1);
+    turnBend(0);
     break ;
 }
         break;
