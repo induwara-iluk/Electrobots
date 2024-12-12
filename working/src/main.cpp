@@ -8,7 +8,11 @@
 #include <Arduino.h>
 #include <ServoController.h>
 #include <Wire.h>
-#include <VL53L0X.h>
+
+
+
+int xshutPins[] = {49, 47, 45, 43};
+uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
 
 
 #define XSHUT_PIN_1 A15
@@ -118,6 +122,70 @@ int left_bend_count = 0;
 int right_bend_count = 0;
 
 
+// variables for task 6
+
+int places[3] = {3,1,2};
+
+bool place_count = 0;
+
+bool Accending = true ;
+
+
+
+
+int path_1[4] = {2, 0, 9, 9};
+int path_2[4] = {2, -1, 1, 9};
+int path_3[4] = {2, -1, 0, 1};
+int path_4[4] = {2, 1, -1, 9};
+int path_5[4] = {2, 1, 0, -1};
+
+int* myarray[5] = {path_5, path_4, path_1, path_2, path_3};
+
+// Define the sizes of lists for each element
+int sizes[3][3] = {
+    {2, 3, 4}, // Row 0
+    {3, 2, 3}, // Row 1
+    {4, 3, 2}  // Row 2
+};
+
+// Function to retrieve the path based on x and y
+int* definepath(int x, int y) {
+    int sub_place = y - x;
+    return myarray[sub_place + 2]; // Return pointer to the path array
+}
+
+int backpath_1[4] = { 0, 5, 9,9};
+int backpath_2[4] = { -1, 1, 5,9};
+int backpath_3[4] = { -1, 0, 1,9};
+int backpath_4[4] = { 1, -1, 5,9};
+int backpath_5[4] = { 1, 0, -1,9};
+
+int* backarray[5] = {backpath_5,backpath_4,backpath_1,backpath_2,backpath_1};
+
+int* backpath(int a,int b) {
+  int sub_place = a-b;
+  return backarray[sub_place + 2];
+}
+
+
+
+
+
+int currentInstructionIndex = 0; // Keeps track of the current instruction
+int instruction[4] = {-1,5,9,9} ;   // Array of instructions
+int instructionCount  = 1 ;        // Total number of instructions
+bool stopRobot = false;
+int boxcount = 1;
+
+bool allSensorsDetectwhite(int sen[]) {
+  int sensorThresholds = 350;
+  for (int i = 0; i < 11; i++) {
+    if (sen[i] >= sensorThresholds) {
+      return false; // Return false if any sensor detects below the threshold
+    }
+  }
+  return true; // Return true if all sensors detect values above the threshold
+}
 
 
 
@@ -155,14 +223,17 @@ void setup() {
 
   initializePins();
 
-  
-
-
   boxHandler.attachGripper(4); // Attach the gripper servo to pin 9
   boxHandler.attachArm(7);    // Attach the arm servo to pin 10
 
 
   Serial.begin(9600);
+
+   if (!tof.init()) {
+    Serial.println("Failed to initialize VL53L0X sensor!");
+    while (1);
+  }
+
 
   // if (colorSensor.begin()) {
   //   Serial.println("TCS34725 found");
@@ -283,7 +354,7 @@ void turnBend(byte direction){
     oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
     motor.setMotorSpeed(-70,70);
 
-    if (R_encoder_ticks > 150 && L_encoder_ticks  >150){
+    if (R_encoder_ticks > 130 && L_encoder_ticks  >130){
       L_encoder_ticks = 0;
       R_encoder_ticks = 0;
       return;
@@ -295,7 +366,7 @@ void turnBend(byte direction){
     oledDisplay.displayText("right turn",1,0,0);  
     oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50); 
     motor.setMotorSpeed(70,-70);
-    if (R_encoder_ticks > 150 && L_encoder_ticks  > 150){
+    if (R_encoder_ticks > 120 && L_encoder_ticks  > 120){
       L_encoder_ticks = 0;
       R_encoder_ticks = 0;
       return;
@@ -303,6 +374,15 @@ void turnBend(byte direction){
     
   }
 
+}
+
+bool junctionDetected(int binarySensors[]) {
+  if ((binarySensors[0 ] && binarySensors[11])|| (binarySensors[0] || binarySensors[1]) || (binarySensors[10] || binarySensors[11])) {
+    return true;
+  } else {  
+    return false;
+    
+  }
 }
 
 int detectBend(){
@@ -355,7 +435,7 @@ void turn180left(){
   while (true)
   {
     motor.setMotorSpeed(-70,70);
-    if (R_encoder_ticks > 310 && L_encoder_ticks  > 310){
+    if (R_encoder_ticks > 300 && L_encoder_ticks  > 300){
       motor.stopRobot();
       return;
   }
@@ -369,7 +449,7 @@ void turn180right(){
   while (true)
   {
     motor.setMotorSpeed(70,-70);
-    if (R_encoder_ticks > 290 && L_encoder_ticks  > 290){
+    if (R_encoder_ticks > 300 && L_encoder_ticks  > 300){
       motor.stopRobot();
       return;
   }
@@ -448,6 +528,131 @@ void decodeBarcode(){
     irReader.setColour(colour);
 
     while (historyIndex < historySize) {
+
+
+void loop() {
+    switch (stage) {
+        case 1:
+            break;
+
+        case 2:
+            // Code for case value2
+            break;
+
+        // Add more cases as needed
+        case 3:
+           
+
+            while (true) {
+
+                oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
+                oledDisplay.displayText("stage 3 " + String(instruction[currentInstructionIndex]),1,0,30);
+                oledDisplay.displayText("aneem " + String(currentInstructionIndex ),1,0,50);
+                irReader.readSensors(sensors);
+                irReader.convertSensorsToBinary(sensors, binarySensors);
+
+                // Process line following until all sensors detect white
+                if (instruction[currentInstructionIndex] == 5 && allSensorsDetectwhite(sensors)) {
+                    motor.stopRobot();
+                    delay(1000);
+                     // Reset the current instruction index
+                        currentInstructionIndex = 0;
+
+                      // Update the instruction array
+                      int* newInstructions = definepath(boxcount, places[boxcount-1]);
+                      for (int i = 0; i < 4; i++) {
+                          instruction[i] = newInstructions[i];
+                      }
+
+                      // Update the instruction count
+                      instructionCount = sizes[boxcount-1][places[boxcount]-1];
+
+                      oledDisplay.displayText(" count" + String(instructionCount),1,0,0);
+                      delay(2000);
+
+                    break;
+                }
+                if (currentInstructionIndex >= instructionCount && allSensorsDetectwhite(sensors)) {
+                        motor.stopRobot();
+                        delay(1000);
+                        boxHandler.lowerArm();
+                        boxHandler.releaseBox();
+                        moveDistance(0.04, -65);
+                        turn180right();
+                        moveDistance(0.04, -65);
+                        delay(1000);
+
+                        int* new_instruction = backpath(boxcount+1,places[boxcount-1]);
+                        instructionCount =sizes[places[boxcount-1]-1][boxcount-1];
+                        currentInstructionIndex = 0;
+                        oledDisplay.displayText("back " + String(currentInstructionIndex),1,0,0);
+                        oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
+                        delay(2000);
+                        boxcount++;
+
+
+
+                        break; // Exit the loop
+                    }
+
+                // Check if a junction or bend is detected
+                if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2   ) {
+                    
+                    motor.stopRobot();
+                    delay(500); // Wait for 0.5 seconds
+
+                    // Process the current instruction based on the instruction array
+                    switch (instruction[currentInstructionIndex]) {
+                        case 2:
+
+                            
+                            boxHandler.grabBox();
+                            boxHandler.liftBox();
+                            moveDistance(0.04, -65);
+                            turn180right();
+                            moveDistance(0.04, -65);
+                            oledDisplay.displayText("hiiii " + String(currentInstructionIndex),1,0,20);
+                            
+                            break;
+                        case -1:
+                            // Turn left
+                            moveDistance(0.01,65);
+                            turnBend(0);
+                            break;
+                        case 0:
+                            // Go straight
+                            
+                            moveDistance(0.06, 65);
+                            break;
+                        case 1:
+                            // Turn right
+                            moveDistance(0.01,65);
+                            turnBend(1);
+
+                            
+                            break;
+                        default:
+                            processLineFollowing(binarySensors);
+                            break;
+                    }
+                    currentInstructionIndex++;
+                } else {
+                    // Process line-following logic when no junction or bend is detected
+                    processLineFollowing(binarySensors);
+                }
+            }
+            break;
+
+        default:
+            irReader.readSensors(sensors);
+            irReader.convertSensorsToBinary(sensors, binarySensors);
+            processLineFollowing(binarySensors);
+            break;
+    }
+}
+
+/*
+while (historyIndex < historySize) {
     straightMove(60);
     delay(50);
     // Read sensors
@@ -648,4 +853,5 @@ switch (stage) {
   //   Serial.println(senHistory[i]); // Print each element on a new line
   //}
 }
-}
+
+

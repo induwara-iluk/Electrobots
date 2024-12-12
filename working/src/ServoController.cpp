@@ -24,24 +24,36 @@ void ServoController::attachArm(int pin) {
 
 // Function to grab the box
 void ServoController::grabBox() {
-  gripperServo.write(gripperClosed);
+  for (int pos = gripperServo.read(); pos <= gripperClosed; pos++) {
+    gripperServo.write(pos);
+    delay(15); // Adjust the delay as needed for smooth movement
+  }
   delay(500); // Wait for the servo to move
 }
 
 // Function to release the box
 void ServoController::releaseBox() {
-  gripperServo.write(gripperOpen);
+  for (int pos = gripperServo.read(); pos >= gripperOpen; pos--) {
+    gripperServo.write(pos);
+    delay(15); // Adjust the delay as needed for smooth movement
+  }
   delay(500); // Wait for the servo to move
 }
 
 // Function to lift the box
 void ServoController::liftBox() {
-  armServo.write(armUp);
+  for (int pos = armServo.read(); pos <= armUp; pos++) {
+    armServo.write(pos);
+    delay(15); // Adjust the delay as needed for smooth movement
+  }
   delay(500); // Wait for the servo to move
 }
 
 // Function to lower the arm
 void ServoController::lowerArm() {
-  armServo.write(armDown);
+  for (int pos = armServo.read(); pos >= armDown; pos--) {
+    armServo.write(pos);
+    delay(15); // Adjust the delay as needed for smooth movement
+  }
   delay(500); // Wait for the servo to move
 }
