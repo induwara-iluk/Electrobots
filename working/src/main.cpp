@@ -127,23 +127,41 @@ int right_bend_count = 0;
 /////////////////////////////////////
 // variables for task 2 
 
-int VirtualInstructionsWall[14] = {1,7,1,0,7,0} ;
+int wallChecked = -1 ;
+int wallDetected= -1 ;
+bool wallDetectionFinished = false ;
+bool returnedToStart = false ;
+bool virtualBoxFinished = false ;
+bool braaughtToCheckpoint = false ;
 
-int VirtualInstructions0a[14] = {1,2,3,-1,-1,-1,4,3,-1,-1,-1,2,5,6} ;
-int VirtualInstructions0b[16] = {1,2,3,-1,-1,-1,4,7,7,3,-1,-1,-1,2,5,6} ;
 
 
-int VirtualInstructions1a[13] = {8,1,1,1,4,7,3} ;
-int VirtualInstructions3b[13] = {8,1,1,1,4,7,3} ;
+int VirtualInstructionsWall[2][8]={{1,2,3,-1,0,7,0,9},{1,7,1,0,7,0,9}} ;
 
-int VirtualInstructions13[13] = {1,1,2,7,3} ;
-int VirtualInstructions23[13] = {1,1,7,2,3} ;
-int VirtualInstructions43[13] = {1,1,7,7,7,7,4,3,-1,-1,7,-1,-1} ;
+int VirtualInstructionsReturn[2][14]={{7,7,10},{7,7,7,-1,10}} ;
 
-int VirtualInstructions21[13] = {1,1,7,4,3} ;
-int VirtualInstructions31[13] = {1,1,7,7,4,3} ;
-int VirtualInstructions41[13] = {1,1,7,7,7,7,4,3} ;
+int VirtualInstructionsFinish[2][5][14] = {
+  //close wall
+  {
+    {1,-1,4,3,-1,-1,-1,2,11,100},
+    {8,1,1,4,7,11,100},
+   {-1,7,4,3,-1,-1,-1,4,7,11,100} ,
+   {-1,7,7,4,3,-1,-1,-1,4,7,11,100} ,
+   {-1,7,7,7,7,4,3,-1,-1,-1,4,7,11,100} 
+  },
+
+  //far wall
+  {
+  {1,-1,4,7,7,3,-1,-1,-1,2,11,100},
+  {-1,2,7,3,1,1,1,4,7,11,100},
+  {-1,7,2,3,1,1,1,4,7,11,100},
+  {8,1,7,7,1,4,7,11,100},
+  {-1,7,7,7,7,4,3,-1,-1,-1,4,7,11,100}
+}
+} ;
+
 int VirCount = 0 ;
+int* currentInstruction = VirtualInstructionsWall[0];
 
 
 
@@ -163,7 +181,7 @@ bool pick_box = false;
 
 int box = 0;
 
-int releases = 3;
+int releases = 0;
 
 
 int path_1[4] = {2, 0, 9, 9};
@@ -173,7 +191,13 @@ int path_4[4] = {2, 1, -1, 9};
 int path_5[4] = {2, 1, 0, -1};
 
 int* myarray[5] = {path_5, path_4, path_1, path_2, path_3};
-
+int checkZero(int barcode){
+  if(barcode==0){
+    return 0 ;
+  }else{
+    return 1 ;
+  }
+}
 // Define the sizes of lists for each element
 int sizes[3][3] = {
     {2, 3, 4}, // Row 0
@@ -295,7 +319,7 @@ void setup() {
 
   // int sensorThresholds =  calibrate(sensors);
   //oledDisplay.displayText(String(sensorThresholds),1,0,20);
-  delay(2000);
+  delay(1000);
 
 
   
@@ -596,7 +620,7 @@ void decodeBarcode(){
 
     if (testCount > 6 ){
       motor.stopRobot();
-      delay(1000);
+      delay(500);
       historyIndex = historySize+1 ;
       break;
     }
@@ -604,10 +628,9 @@ void decodeBarcode(){
     historyIndex++;
 }
 motor.stopRobot();
-      delay(1000);
 barcode = processSensorHistory(senHistory);
 oledDisplay.displayText(String(barcode));
-delay(1000);
+delay(500);
 irReader.setColour(0);
 stage = 2; 
 }
@@ -647,108 +670,15 @@ void updateDistances() {
 }
 
 
-void loop() {
-    switch (stage) {
-      case 0 :
 
-      break;
-
-        case 1:
-    decodeBarcode();
-
-        break;
-
-        // stage 2 
-    case 2:
-        while(true){
-        irReader.readSensors(sensors);
-        irReader.convertSensorsToBinary(sensors, binarySensors);
-
-        if(junctionDetected( binarySensors)){
+void followVirtualInstructions(int currentInstruction[14]){
+    if(junctionDetected( binarySensors)){
           motor.stopRobot();
-          //oledDisplay.displayText("junction detected" + String(VirtualInstructions[VirCount]),1,0,0);
           oledDisplay.displayText("Vir count"+ String(VirCount),1,0,0);
-          motor.stopRobot();
-          delay(1000);
-          switch(VirtualInstructions3b[VirCount]){
-            case 0 :// Go straight
-                            
-                            if (instruction[currentInstructionIndex + 1 ] == 9){
-                              motor.stopRobot();
-                              moveDistance(0.05,70);
-                              
-                              const int iterations = 7;
-                              int distancesBottom[iterations];
-                              int distancesMiddle[iterations];
-                              int distancesTop[iterations];
-
-                              // Collect data for 3 iterations
-                              for (int i = 0; i < iterations; i++) {
-                                updateDistances();
-                               
-
-                                distancesBottom[i] = sensorDistances[1];
-                                distancesMiddle[i] = sensorDistances[2];
-                                distancesTop[i] = sensorDistances[3];
-        
-                              }
-
-
-                              sortArray(distancesBottom, iterations);
-                              sortArray(distancesMiddle, iterations);
-                              sortArray(distancesTop, iterations);
-
-                              // Get the median (middle) value
-                              int medianBottom = distancesBottom[iterations / 2];
-                              int medianMiddle = distancesMiddle[iterations / 2];
-                              int medianTop = distancesTop[iterations / 2];
-
-
-
-                              oledDisplay.displayText(String(medianBottom ) + " " + String(medianMiddle) + " " + String(medianTop),1,0,20);
-                              
-                              if(medianTop<400){
-                                box = 3;
-                              }else if(medianMiddle<400){
-                                box = 2;
-                              }else{
-                                box = 1;
-                              }
-
-                              if (!Accending ){
-                                places[box_count] = 4-box;
-                              }
-                              else{
-                                places[box_count] = box;
-                              }
-
-                              if (box_count == 0){
-                                moveDistance(0.03,65);
-                              }
-                              oledDisplay.displayText("box " + String(box)+ " box count " +  String(box_count),1,0,0);
-                              
-                              box_count++;
-
-                              
-                              if (box_count == 2) {
-                                places[box_count] = nextBox(places[0], places[1]);
-                                motor.stopRobot();
-                                delay(1000);
-                                moveDistance(0.03,-65);
-                                currentInstructionIndex = -1;
-                                instructionCount = 2;
-                                instruction[0] =1;
-                                instruction[1] =5;
-                                instruction[2] =9;
-                                instruction[3] =9;
-                                oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
-                                turn180left();
-                                moveDistance(0.15,-65);
-                  
-                                delay(500);
-                                break;
-            break;
-            case 2:
+          delay(200);
+         
+          switch(currentInstruction[VirCount]){
+            case 2 :
             LED(1);
             moveDistance(0.04,65);
             break;
@@ -787,22 +717,119 @@ void loop() {
             motor.stopRobot();
             break;
             case 7:
-            moveDistance(0.08,65);
+            moveDistance(0.04,65);
             break;
             case 8 :
             turn180right();
             break;
+            case 9:
+            motor.stopRobot();
+            wallDetectionFinished = true ;
+            oledDisplay.displayText(("wall "+String(wallDetected)),1,0,0);
+            delay(1000);
+            turn180left();
+            moveDistance(0.05,-65);
+            VirCount=-1;
+            break;
+            case 10 :
+            motor.stopRobot();
+            returnedToStart = true ;
+            VirCount=-1;
+            delay(2000);
+            break;
+            case 100:
+            motor.stopRobot();
+            VirCount = -1 ;
+            virtualBoxFinished=true;
+            break;
+            case 11:
+            moveDistance(0.08,65);
+            motor.stopRobot();
+            LED(0);
+            break ; 
+            break ;
+            case 0 :// Go straight
+            motor.stopRobot();
+            moveDistance(0.05,70);
+            wallChecked++ ;
+            const int iterations = 7;
+            int distancesBottom[iterations];
+            int distancesMiddle[iterations];
+            
+
+            for (int i = 0; i < iterations; i++) {
+              updateDistances();
+              
+
+              distancesBottom[i] = sensorDistances[1];
+              distancesMiddle[i] = sensorDistances[2];
+              
+
+            }
+              sortArray(distancesBottom, iterations);
+            sortArray(distancesMiddle, iterations);
+
+            int medianBottom = distancesBottom[iterations / 2];
+            int medianMiddle = distancesMiddle[iterations / 2];
+            
+            if (medianBottom < 700 && medianMiddle < 700){
+            
+              wallDetected = wallChecked ;
+              oledDisplay.displayText(("wall detected"+String(wallDetected)),1,0,0);
+              delay(500);
+            }
+            break;
+            
+
+            
           }
           motor.stopRobot();
-          delay(1000);
+          delay(500);
           VirCount ++ ;
         }else{
             processLineFollowing(binarySensors);
         }
+}
 
 
-      }
+void loop() {
+  switch (stage) {
+    case 0 :
 
+    break;
+
+        case 1:
+    decodeBarcode();
+
+        break;
+
+        // stage 2 
+    case 2:
+        while(true){
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+        if(wallDetectionFinished == false){
+          currentInstruction = VirtualInstructionsWall[checkZero(barcode)] ;
+          }
+          else{
+            if (returnedToStart == false){
+              currentInstruction = VirtualInstructionsReturn[checkZero(barcode)] ;
+            } else{
+              currentInstruction = VirtualInstructionsFinish[1-wallDetected][barcode] ;
+
+              if(virtualBoxFinished ){
+                turn180left();
+                turn180left();
+            }
+            
+
+          }}
+          
+          followVirtualInstructions(currentInstruction);
+        }
+        
+        
+      
 
         case 3:
             irReader.setColour(1);
@@ -813,7 +840,7 @@ void loop() {
 
               if (junctionDetected(sensors)){
                 motor.stopRobot();
-                delay(1000);  
+                delay(500);  
                 moveDistance(0.08 , 65);
                 turnBend(1);
                 
@@ -1093,8 +1120,9 @@ void loop() {
     processLineFollowing(binarySensors); 
 
     break;
+  }
 }
-}
+
 /*
 while (historyIndex < historySize) {
     straightMove(60);
