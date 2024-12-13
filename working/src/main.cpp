@@ -8,11 +8,19 @@
 #include <Arduino.h>
 #include <ServoController.h>
 #include <Wire.h>
+#include "VL53L0X_MultiSensor.h"
+
+
+
 
 
 
 int xshutPins[] = {49, 47, 45, 43};
 uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
+
+
+
+VL53L0X_MultiSensor multiSensor(xshutPins, i2cAddresses, 4);
 
 
 #define XSHUT_PIN_1 A15
@@ -141,13 +149,19 @@ int VirCount = 0 ;
 
 // variables for task 6
 
-int places[3] = {3,1,2};
+int places[3] = {1,2,3};
 
-bool place_count = 0;
+int boxArrangement[3] = {1,2,3};
 
-bool Accending = true ;
+int box_count = 0;
 
+bool Accending = false ;
 
+bool pick_box = false;
+
+int box = 0;
+
+int releases = 0;
 
 
 int path_1[4] = {2, 0, 9, 9};
@@ -173,11 +187,11 @@ int* definepath(int x, int y) {
 
 int backpath_1[4] = { 0, 5, 9,9};
 int backpath_2[4] = { -1, 1, 5,9};
-int backpath_3[4] = { -1, 0, 1,9};
+int backpath_3[4] = { -1, 0, 1,5};
 int backpath_4[4] = { 1, -1, 5,9};
-int backpath_5[4] = { 1, 0, -1,9};
+int backpath_5[4] = { 1, 0, -1,5};
 
-int* backarray[5] = {backpath_5,backpath_4,backpath_1,backpath_2,backpath_1};
+int* backarray[5] = {backpath_3,backpath_2,backpath_1,backpath_4,backpath_5};
 
 int* backpath(int a,int b) {
   int sub_place = a-b;
@@ -189,8 +203,8 @@ int* backpath(int a,int b) {
 
 
 int currentInstructionIndex = 0; // Keeps track of the current instruction
-int instruction[4] = {-1,5,9,9} ;   // Array of instructions
-int instructionCount  = 1 ;        // Total number of instructions
+int instruction[4] = {0,3,0,3} ;   // Array of instructions
+int instructionCount  = 3 ;        // Total number of instructions
 bool stopRobot = false;
 int boxcount = 1;
 
@@ -265,7 +279,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(R_encoder_A), countR, RISING);
   attachInterrupt(digitalPinToInterrupt(L_encoder_A), countL, RISING);
 
-
+  multiSensor.begin();
  
   oledDisplay.begin(); 
   int value1 = digitalRead(switch1);
@@ -596,6 +610,41 @@ irReader.setColour(0);
 stage = 2; 
 }
 
+int nextBox(int a, int b) {
+  int sumOfSet = 1 + 2 + 3;
+  return sumOfSet - (a + b);
+}
+
+
+void sortArray(int arr[], int size) {
+  for (int i = 0; i < size - 1; i++) {
+    for (int j = 0; j < size - i - 1; j++) {
+      if (arr[j] > arr[j + 1]) {
+        // Swap
+        int temp = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
+      }
+    }
+  }
+}
+
+
+int sensorDistances[4]; // Array to hold distances for 4 sensors
+
+void updateDistances() {
+    multiSensor.readDistances(); // Trigger distance measurement
+
+    // Get the distances from the multi-sensor library
+    int* distances = multiSensor.getDistances(); 
+
+    // Copy the distances to the shared array
+    for (int i = 0; i < 4; i++) {
+        sensorDistances[i] = distances[i];
+    }
+}
+
+
 void loop() {
     switch (stage) {
       case 0 :
@@ -677,20 +726,37 @@ void loop() {
 
 
         case 3:
-           
 
-            while (true) {
+            if (releases ==3){
+             moveDistance(0.04 , -65); 
+             irReader.readSensors(sensors);
+             irReader.convertSensorsToBinary(sensors, binarySensors);
+             processLineFollowing(binarySensors);
+             if(junctionDetected(sensors) ){
+              moveDistance(0.04 , 65);
+              turnBend(1);
+
+
+              stage = 8;
+
+               
+             }
+
+            }
+
+
+            
+            while (releases < 3) {
 
                 oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
                 oledDisplay.displayText("stage 3 " + String(instruction[currentInstructionIndex]),1,0,30);
                 oledDisplay.displayText("aneem " + String(currentInstructionIndex ),1,0,50);
                 irReader.readSensors(sensors);
                 irReader.convertSensorsToBinary(sensors, binarySensors);
-
+              
                 // Process line following until all sensors detect white
                 if (instruction[currentInstructionIndex] == 5 && allSensorsDetectwhite(sensors)) {
-                    motor.stopRobot();
-                    delay(1000);
+                    
                      // Reset the current instruction index
                         currentInstructionIndex = 0;
 
@@ -703,36 +769,46 @@ void loop() {
                       // Update the instruction count
                       instructionCount = sizes[boxcount-1][places[boxcount]-1];
 
-                      oledDisplay.displayText(" count" + String(instructionCount),1,0,0);
-                      delay(2000);
+                      
 
                     break;
                 }
-                if (currentInstructionIndex >= instructionCount && allSensorsDetectwhite(sensors)) {
+
+                
+                if (pick_box &&  allSensorsDetectwhite(sensors)) {
                         motor.stopRobot();
-                        delay(1000);
                         boxHandler.lowerArm();
+                        
                         boxHandler.releaseBox();
+                        
                         moveDistance(0.04, -65);
                         turn180right();
                         moveDistance(0.04, -65);
-                        delay(1000);
+                        
+                        releases++;
+                        pick_box = false;
 
                         int* new_instruction = backpath(boxcount+1,places[boxcount-1]);
                         instructionCount =sizes[places[boxcount-1]-1][boxcount-1];
+                        for (int i = 0; i < 4; i++) {
+                          instruction[i] = new_instruction[i];
+                      }
                         currentInstructionIndex = 0;
                         oledDisplay.displayText("back " + String(currentInstructionIndex),1,0,0);
                         oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
-                        delay(2000);
+                        
                         boxcount++;
 
 
 
                         break; // Exit the loop
                     }
+                
+                  
+                     
 
                 // Check if a junction or bend is detected
-                if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2   ) {
+                if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2 ) {
                     
                     motor.stopRobot();
                     delay(500); // Wait for 0.5 seconds
@@ -748,22 +824,111 @@ void loop() {
                             turn180right();
                             moveDistance(0.04, -65);
                             oledDisplay.displayText("hiiii " + String(currentInstructionIndex),1,0,20);
-                            
+                            pick_box = true;
                             break;
                         case -1:
                             // Turn left
-                            moveDistance(0.01,65);
+                            moveDistance(0.02,65);
                             turnBend(0);
                             break;
                         case 0:
                             // Go straight
                             
-                            moveDistance(0.06, 65);
+                            if (instruction[currentInstructionIndex + 1 ] == 3){
+
+
+                              motor.stopRobot();
+                              moveDistance(0.05,70);
+                              
+                              const int iterations = 7;
+                              int distancesBottom[iterations];
+                              int distancesMiddle[iterations];
+                              int distancesTop[iterations];
+
+                              // Collect data for 3 iterations
+                              for (int i = 0; i < iterations; i++) {
+                                updateDistances();
+                               
+
+                                distancesBottom[i] = sensorDistances[1];
+                                distancesMiddle[i] = sensorDistances[2];
+                                distancesTop[i] = sensorDistances[3];
+        
+                              }
+
+
+                              sortArray(distancesBottom, iterations);
+                              sortArray(distancesMiddle, iterations);
+                              sortArray(distancesTop, iterations);
+
+                              // Get the median (middle) value
+                              int medianBottom = distancesBottom[iterations / 2];
+                              int medianMiddle = distancesMiddle[iterations / 2];
+                              int medianTop = distancesTop[iterations / 2];
+
+
+
+                              oledDisplay.displayText(String(medianBottom ) + " " + String(medianMiddle) + " " + String(medianTop),1,0,20);
+                              
+                              if(medianTop<400){
+                                box = 3;
+                              }else if(medianMiddle<400){
+                                box = 2;
+                              }else{
+                                box = 1;
+                              }
+
+                              if (!Accending ){
+                                places[box_count] = 4-box;
+                              }
+                              else{
+                                places[box_count] = box;
+                              }
+
+                              if (box_count == 0){
+                                moveDistance(0.03,65);
+                              }
+                              oledDisplay.displayText("box " + String(box)+ " box count " +  String(box_count),1,0,0);
+                              
+                              box_count++;
+
+                              
+                              if (box_count == 2) {
+                                places[box_count] = nextBox(places[0], places[1]);
+                                motor.stopRobot();
+                                delay(1000);
+                                moveDistance(0.03,-65);
+                                currentInstructionIndex = -1;
+                                instructionCount = 2;
+                                instruction[0] =1;
+                                instruction[1] =5;
+                                instruction[2] =9;
+                                instruction[3] =9;
+                                oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
+                                turn180left();
+                                moveDistance(0.15,-65);
+                  
+                                delay(500);
+                                break;
+                              }
+                              
+                      
+                             
+
+                              
+                              currentInstructionIndex++;
+                              break;
+                              
+                            }
+                            else{
+                              moveDistance(0.04,65);
+                            }
                             break;
                         case 1:
                             // Turn right
-                            moveDistance(0.01,65);
+                            moveDistance(0.02,65);
                             turnBend(1);
+                            break;
 
                             
                             break;
@@ -776,6 +941,25 @@ void loop() {
                     // Process line-following logic when no junction or bend is detected
                     processLineFollowing(binarySensors);
                 }
+            }
+            break;
+
+
+            case 5:
+              updateDistances();
+              oledDisplay.displayText(String(sensorDistances[0]),1,0,50);
+
+            break;
+
+
+            case 8:
+             irReader.readSensors(sensors);
+            irReader.convertSensorsToBinary(sensors, binarySensors);
+            processLineFollowing(binarySensors);
+            if (allSensorsDetectwhite(sensors)){
+              motor.stopRobot();
+              moveDistance(0.04 , -65);
+              turnBend(0);
             }
             break;
 
