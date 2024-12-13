@@ -13,8 +13,6 @@
 
 
 
-
-
 int xshutPins[] = {49, 47, 45, 43};
 uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
 
@@ -91,12 +89,14 @@ float pid_previous_error = 0;
 float pid_integral = 0;
 float pid_derivative = 0;
 
+int blackThreshold = 700 ; 
+int whiteThreshold = 250 ;
 int baseSpeed = 65 ;  // Base speed for the motors
 
 const int historySize = 180; // Size of the history buffer
 int senHistory[historySize]; // History array to store past sensor states
 int historyIndex = 0; // Current index for appending in the history array
-int barcode = 0  ;
+int barcode = 4 ;
 int outputArray[13] = {0};
 
 
@@ -140,25 +140,27 @@ int VirtualInstructionsWall[2][8]={{1,2,3,-1,0,7,0,9},{1,7,1,0,7,0,9}} ;
 
 int VirtualInstructionsReturn[2][14]={{7,7,10},{7,7,7,-1,10}} ;
 
-int VirtualInstructionsFinish[2][5][14] = {
-  //close wall
+int VirtualInstructionsFinish[2][5][19] = {
+  //close wall open
   {
     {1,-1,4,3,-1,-1,-1,2,11,100},
     {8,1,1,4,7,11,100},
    {-1,7,4,3,-1,-1,-1,4,7,11,100} ,
-   {-1,7,7,4,3,-1,-1,-1,4,7,11,100} ,
-   {-1,7,7,7,7,4,3,-1,-1,-1,4,7,11,100} 
+   {-1,7,7,4,7,3,-1,-1,-1,4,7,11,100} ,
+    {-1,7,7,7,4,7,7,3,-1,-1,-1,4,7,11,100}
   },
 
-  //far wall
+  //far wall open
   {
   {1,-1,4,7,7,3,-1,-1,-1,2,11,100},
   {-1,2,7,3,1,1,1,4,7,11,100},
   {-1,7,2,3,1,1,1,4,7,11,100},
   {8,1,7,7,1,4,7,11,100},
-  {-1,7,7,7,7,4,3,-1,-1,-1,4,7,11,100}
+  {-1,7,7,7,4,3,-1,-1,-1,4,7,11,100}
+  
 }
 } ;
+
 
 int VirCount = 0 ;
 int* currentInstruction = VirtualInstructionsWall[0];
@@ -561,14 +563,15 @@ int processSensorHistory(int senHistory[]) {
   int barcodeNumber = 0 ; 
   int outCount = 0 ;
   int consecutiveCount = 0;
+
   for (int i = 0; i < historySize; i++) {
     if (senHistory[i] == 1) {
       consecutiveCount++;
     } else {
-      if(consecutiveCount >2 && consecutiveCount < 6){
+      if(consecutiveCount > 0  && consecutiveCount < 10){
         outputArray[outCount] = 0;
         outCount++;
-      }else if(consecutiveCount > 7){
+      }else if(consecutiveCount > 10){
         outputArray[outCount] = 1;
         outCount++;
       }
@@ -578,12 +581,15 @@ int processSensorHistory(int senHistory[]) {
       
   }
 
-  for (int k = 0 ; k < 9 ; k++){
+  for (int k = 0 ; k < 8 ; k++){
+    Serial.println("");
     Serial.print(outputArray[k]);
-    barcodeNumber = barcodeNumber + outputArray[k] * (1 << (8 - k));
+    barcodeNumber = barcodeNumber + outputArray[k] * (1 << (7 - k));
 
     
   }
+  oledDisplay.displayText(String(barcodeNumber));
+  delay(2000);
   return (barcodeNumber % 5) ;
 
 }
@@ -594,7 +600,7 @@ void decodeBarcode(){
 
     while (historyIndex < historySize) {
     straightMove(60);
-    delay(50);
+    delay(40);
     // Read sensors
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
@@ -606,13 +612,14 @@ void decodeBarcode(){
     }
 
     // Update sensor history based on the sum
-    if (sum > 8) {
+    if (sum > 10) {
         senHistory[historyIndex] = 1; // White line
     }  else {
       senHistory[historyIndex] = 0;
     }
     Serial.print(senHistory[historyIndex]);
-    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1) ) {
+
+    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1|| binarySensors[10] == 1 || binarySensors[1] == 1) ) {
     testCount = testCount+1 ;
   }else{
     testCount = 0 ;
@@ -735,7 +742,7 @@ void followVirtualInstructions(int currentInstruction[14]){
             motor.stopRobot();
             returnedToStart = true ;
             VirCount=-1;
-            delay(2000);
+            delay(200);
             break;
             case 100:
             motor.stopRobot();
@@ -776,7 +783,7 @@ void followVirtualInstructions(int currentInstruction[14]){
             
               wallDetected = wallChecked ;
               oledDisplay.displayText(("wall detected"+String(wallDetected)),1,0,0);
-              delay(500);
+              delay(200);
             }
             break;
             
@@ -795,6 +802,9 @@ void followVirtualInstructions(int currentInstruction[14]){
 void loop() {
   switch (stage) {
     case 0 :
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors,binarySensors);
+    oledDisplay.displayText(irValues_str,1.5,0,0);
 
     break;
 
@@ -818,8 +828,11 @@ void loop() {
               currentInstruction = VirtualInstructionsFinish[1-wallDetected][barcode] ;
 
               if(virtualBoxFinished ){
-                turn180left();
-                turn180left();
+                motor.stopRobot();
+                stage = 4 ;
+                delay(1000);
+                moveDistance(0.15,65);
+                
             }
             
 
@@ -1091,7 +1104,12 @@ void loop() {
             processLineFollowing(binarySensors);
             break;
     
-
+    case 4 :
+            irReader.setColour(2);
+            irReader.readSensors(sensors);
+            irReader.convertSensorsToBinary(sensors, binarySensors);
+            processLineFollowing(binarySensors);
+    break ;
     case 6 :
     
 

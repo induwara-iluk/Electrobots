@@ -17,15 +17,25 @@ void readIR::convertSensorsToBinary(int sensors[], int sen[]) {
     int sensorThreshold = 600;
     irValues_str = "";
     for (int i = 0; i < 12; i++) {
-        sen[i] = (sensors[i] < sensorThreshold) ? 1 : 0;
+        sen[i] = (sensors[i] < 600 ) ? 1 : 0;
         irValues_str += sensors[i];
         irValues_str += " ";
-    }} else if(colour == 1) {
+    }} 
+    else if(colour == 1) {
     int sensorThreshold = 350;
     irValues_str = "";
     for (int i = 0; i < 12; i++) {
-        sen[i] = (sensors[i] > sensorThreshold) ? 1 : 0;
+        sen[i] = (sensors[i] > 350) ? 1 : 0;
         irValues_str += sensors[i];
         irValues_str += " ";
-    }}
+    }} else if (colour == 2 ){
+        int sensorThreshold = 350;
+    irValues_str = "";
+    for (int i = 0; i < 12; i++) {
+        sen[i] = (sensors[i] < 750) ? 1 : 0;
+        irValues_str += sensors[i];
+        irValues_str += " ";
+    }
+        
+    }
 }

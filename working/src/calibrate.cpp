@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <calibrate.h>
+#include <MotorControl.h>
 
 int history[800];
 int threshold = 0;  // Variable to store the threshold value
@@ -10,6 +11,7 @@ int calibrate(int sensors[8]) {
     // Adjust speeds as needed for rotation
 
     // Populate history array with sensor readings
+   
     for (int j = 0; j < 800; j++) {
         int i = j % 8;
         history[j] = analogRead(A0 + i);
