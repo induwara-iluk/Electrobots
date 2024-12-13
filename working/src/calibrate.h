@@ -5,6 +5,6 @@
 
 extern void setMotorSpeed(int speedLeft, int speedRight);  // Declare the external motor speed function
 
-int calibrate(int sensors[8]);  // Declare the calibrate function
+void calibrate( int threshold[12],int mode);  // Declare the calibrate function
 
 #endif

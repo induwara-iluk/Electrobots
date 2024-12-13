@@ -14,28 +14,17 @@ void readIR::setColour(int value) {
 void readIR::convertSensorsToBinary(int sensors[], int sen[]) {
 
    if(colour == 0) {
-    int sensorThreshold = 600;
     irValues_str = "";
     for (int i = 0; i < 12; i++) {
-        sen[i] = (sensors[i] < 600 ) ? 1 : 0;
+        sen[i] = (sensors[i] < whiteLineThresholds[i] ) ? 1 : 0;
         irValues_str += sensors[i];
         irValues_str += " ";
     }} 
     else if(colour == 1) {
-    int sensorThreshold = 350;
     irValues_str = "";
     for (int i = 0; i < 12; i++) {
-        sen[i] = (sensors[i] > 350) ? 1 : 0;
+        sen[i] = (sensors[i] > blackLineThresholds[i]) ? 1 : 0;
         irValues_str += sensors[i];
         irValues_str += " ";
-    }} else if (colour == 2 ){
-        int sensorThreshold = 350;
-    irValues_str = "";
-    for (int i = 0; i < 12; i++) {
-        sen[i] = (sensors[i] < 750) ? 1 : 0;
-        irValues_str += sensors[i];
-        irValues_str += " ";
-    }
-        
-    }
+    }} 
 }

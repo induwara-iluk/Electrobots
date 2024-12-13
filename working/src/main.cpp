@@ -54,6 +54,14 @@ MotorControl motor(PWML, FL, B_L, PWMR, FR, B_R);
 int sensors[12];
 int binarySensors[12];
 
+int  blackThreshold = 700 ;
+int  whiteThreshold = 250 ;
+int  colourThreshold = 700 ;
+
+int whiteLineThresholds[12] = {700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700};
+int blackLineThresholds[12] = {250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250};
+
+
 const int btn1 = 18;
 const int btn2 = 19;
 const int LEDpin= 41 ;
@@ -80,8 +88,7 @@ float pid_previous_error = 0;
 float pid_integral = 0;
 float pid_derivative = 0;
 
-int blackThreshold = 700 ; 
-int whiteThreshold = 250 ;
+
 int baseSpeed = 65 ;  // Base speed for the motors
 
 const int historySize = 180; // Size of the history buffer
@@ -278,6 +285,16 @@ void kDown()
   Kp -= 0.1;
 }
 
+void LED(int status){
+
+  if(status){
+    digitalWrite(LEDpin,HIGH);
+
+  }else{
+    digitalWrite(LEDpin,LOW);
+  }
+}
+
 void setup()
 {
 
@@ -311,6 +328,15 @@ void setup()
   int value3 = digitalRead(switch3);
   int value4 = digitalRead(switch4);
 
+ LED(1);
+    calibrate(whiteLineThresholds,0);
+    LED(0);
+    delay(10000);
+    LED(1);
+    calibrate(blackLineThresholds,1);
+    LED(0);
+    delay(10000);
+    
   stage = value1*1 + value2*2 + value3*3 +value4*4;
 
   oledDisplay.displayText("Stage : " + String(stage),1.5,0,0);
@@ -372,15 +398,7 @@ void setup()
   }   
   
 
-void LED(int status){
 
-  if(status){
-    digitalWrite(LEDpin,HIGH);
-
-  }else{
-    digitalWrite(LEDpin,LOW);
-  }
-}
   
 
 void moveDistance(float distance, int speed) {
@@ -746,6 +764,11 @@ void followVirtualInstructions(int currentInstruction[14]){
             motor.stopRobot();
             wallDetectionFinished = true ;
             oledDisplay.displayText(("wall "+String(wallDetected)),1,0,0);
+            if(wallDetected == 0){
+              Accending = true;
+            }else{
+              Accending = false;
+            }
             delay(1000);
             turn180left();
             moveDistance(0.05,-65);
@@ -792,7 +815,7 @@ void followVirtualInstructions(int currentInstruction[14]){
             int medianBottom = distancesBottom[iterations / 2];
             int medianMiddle = distancesMiddle[iterations / 2];
             
-            if (medianBottom < 700 && medianMiddle < 700){
+            if (medianBottom < 700 ){
             
               wallDetected = wallChecked ;
               oledDisplay.displayText(("wall detected"+String(wallDetected)),1,0,0);
@@ -815,10 +838,12 @@ void followVirtualInstructions(int currentInstruction[14]){
 void loop() {
   switch (stage) {
     case 0 :
+
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors,binarySensors);
-    oledDisplay.displayText(irValues_str,1.5,0,0);
+    oledDisplay.displayText(irValues_str,1,0,0);
 
+    
     break;
 
         case 1:
@@ -1098,10 +1123,23 @@ void loop() {
             break;
     
     case 4 :
-            irReader.setColour(2);
+            irReader.setColour(0);
             irReader.readSensors(sensors);
             irReader.convertSensorsToBinary(sensors, binarySensors);
-            processLineFollowing(binarySensors);
+            if(allSensorsDetectwhite(sensors)){
+              motor.stopRobot();
+              moveDistance(0.06 , 65);
+              irReader.readSensors(sensors);
+              irReader.convertSensorsToBinary(sensors, binarySensors);
+              if(allSensorsDetectwhite(sensors)){
+                motor.stopRobot();
+                delay(1000);
+                stage = 6 ;
+
+              }
+            }else{
+            processLineFollowing(binarySensors);}
+
     break ;
     case 6 :
     
@@ -1131,6 +1169,12 @@ void loop() {
     processLineFollowing(binarySensors); 
 
     break;
+    case 9 :// padda padda yana eka 
+    irReader.setColour(1);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    processLineFollowing(binarySensors); 
+    break ;
   }
 }
 
