@@ -128,14 +128,14 @@ int right_bend_count = 0;
 // variables for task 2 
 
 int VirtualInstructions0a[14] = {1,2,3,-1,-1,-1,4,3,-1,-1,-1,2,5,6} ;
-int VirtualInstructions0b[14] = {1,2,3,-1,-1,-1,4,7,7,3,-1,-1,-1,2,5,6} ;
+int VirtualInstructions0b[16] = {1,2,3,-1,-1,-1,4,7,7,3,-1,-1,-1,2,5,6} ;
 
 
 int VirtualInstructions1a[13] = {8,1,1,1,4,7,3} ;
 int VirtualInstructions3b[13] = {8,1,1,1,4,7,3} ;
 
 int VirtualInstructions13[13] = {1,1,2,7,3} ;
-int VirtualInstructions23[13] = {1,1,7,,2,3} ;
+int VirtualInstructions23[13] = {1,1,7,2,3} ;
 int VirtualInstructions43[13] = {1,1,7,7,7,7,4,3,-1,-1,7,-1,-1} ;
 
 int VirtualInstructions21[13] = {1,1,7,4,3} ;
@@ -161,7 +161,7 @@ bool pick_box = false;
 
 int box = 0;
 
-int releases = 0;
+int releases = 3;
 
 
 int path_1[4] = {2, 0, 9, 9};
@@ -218,7 +218,24 @@ bool allSensorsDetectwhite(int sen[]) {
   return true; // Return true if all sensors detect values above the threshold
 }
 
+int* createArrayBasedOnSum(int sum) {
+    static int array[4]; // Ensure the array has enough space
 
+    // Initialize the array with default values
+    for (int i = 0; i < 4; i++) {
+        array[i] = 0;
+    }
+
+    // Set the first element to 1
+    array[0] = 1;
+
+    // Set the rest of the elements based on the value of sum
+    for (int i = 1; i <= sum; i++) {
+        array[i] = 7;
+    }
+
+    return array;
+}
 
 void initializePins() {
   for (int i = A0; i <= A15; i++) {
@@ -725,27 +742,7 @@ void loop() {
       }
 
 
-        case 3:
-
-            if (releases ==3){
-             moveDistance(0.04 , -65); 
-             irReader.readSensors(sensors);
-             irReader.convertSensorsToBinary(sensors, binarySensors);
-             processLineFollowing(binarySensors);
-             if(junctionDetected(sensors) ){
-              moveDistance(0.04 , 65);
-              turnBend(1);
-
-
-              stage = 8;
-
-               
-             }
-
-            }
-
-
-            
+        case 3:          
             while (releases < 3) {
 
                 oledDisplay.displayText("stage 3 " + String(instruction[0])+" "+String(instruction[1])+" "+String(instruction[2])+" "+String(instruction[3]),1,0,0);
@@ -786,6 +783,16 @@ void loop() {
                         moveDistance(0.04, -65);
                         
                         releases++;
+                        if(releases == 3){
+                            int damm = places[2];
+                            int* arr = createArrayBasedOnSum(damm);
+                             for (int i = 0; i < 4; i++) {
+                                 instruction[i] = arr[i];
+                             }
+                             currentInstructionIndex = 0 ;
+                            
+                        break;
+                        }
                         pick_box = false;
 
                         int* new_instruction = backpath(boxcount+1,places[boxcount-1]);
@@ -929,8 +936,8 @@ void loop() {
                             moveDistance(0.02,65);
                             turnBend(1);
                             break;
-
-                            
+                            case 7:
+                            stage = 8;
                             break;
                         default:
                             processLineFollowing(binarySensors);
@@ -970,36 +977,34 @@ void loop() {
             break;
     
 
-    case 5 :
+    case 6 :
     
 
-    while(binarySensors[0] == 0 && binarySensors[11]==0){
-      irReader.setColour(0);
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-        processLineFollowing(binarySensors); 
-        }
-        motor.stopRobot();
-        delay(1000);
-        while(binarySensors[0] != 0 && binarySensors[11]!=0){
-      irReader.setColour(0);
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-        processLineFollowing(binarySensors); 
-        }
-
-        stage = 6 ;
-       
-        break;
-    case 6 : 
+    irReader.setColour(0);
+irReader.readSensors(sensors);
+irReader.convertSensorsToBinary(sensors, binarySensors);
+processLineFollowing(binarySensors);
+motor.stopRobot();
+delay(1000);
+while (binarySensors[0] != 0 && binarySensors[11] != 0) {
     irReader.setColour(0);
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
-    processLineFollowing(binarySensors); 
+    processLineFollowing(binarySensors);
+}
 
+stage = 7;
+break;
+
+case 8:
+    irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    processLineFollowing(binarySensors);
     break;
-}
-}
+    }
+    }
+
 /*
 while (historyIndex < historySize) {
     straightMove(60);
