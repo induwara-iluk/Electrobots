@@ -14,28 +14,27 @@ int xshutPins[] = {49, 47, 45, 43};
 uint8_t i2cAddresses[] = {0x30, 0x31, 0x32, 0x33};
 
 VL53L0X_MultiSensor multiSensor(xshutPins, i2cAddresses, 4);
-
+int scape_bend;
 
 #define XSHUT_PIN_1 A15
 #define XSHUT_PIN_2 A13
 #define XSHUT_PIN_3 A11
 
-
 ServoController boxHandler;
 
 //////////////////////////////
-// stage handler 
+// stage handler
 
 #define switch1 33
 #define switch2 35
 #define switch3 37
 #define switch4 39
-int bendNumber = 0 ;
-int stage = 0 ;
-int testCount = 0 ;
+int bendNumber = 0;
+int stage = 0;
+int testCount = 0;
 int colour;
 
-//TCSColorSensor colorSensor;
+// TCSColorSensor colorSensor;
 oled oledDisplay;
 readIR irReader;
 
@@ -54,17 +53,16 @@ MotorControl motor(PWML, FL, B_L, PWMR, FR, B_R);
 int sensors[12];
 int binarySensors[12];
 
-int  blackThreshold = 700 ;
-int  whiteThreshold = 250 ;
-int  colourThreshold = 700 ;
+int blackThreshold = 700;
+int whiteThreshold = 250;
+int colourThreshold = 700;
 
 int whiteLineThresholds[12] = {700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700};
 int blackLineThresholds[12] = {250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250, 250};
 
-
 const int btn1 = 18;
 const int btn2 = 19;
-const int LEDpin= 41 ;
+const int LEDpin = 41;
 
 const int leftIR = A4;
 const int rightIR = A15;
@@ -88,16 +86,13 @@ float pid_previous_error = 0;
 float pid_integral = 0;
 float pid_derivative = 0;
 
-
-int baseSpeed = 65 ;  // Base speed for the motors
+int baseSpeed = 65; // Base speed for the motors
 
 const int historySize = 180; // Size of the history buffer
 int senHistory[historySize]; // History array to store past sensor states
-int historyIndex = 0; // Current index for appending in the history array
-int barcode = 4 ;
+int historyIndex = 0;        // Current index for appending in the history array
+int barcode = 4;
 int outputArray[13] = {0};
-
-
 
 const int R_encoder_A = 2;
 
@@ -108,6 +103,10 @@ volatile long L_encoder_ticks = 0;
 
 const float wheel_diameter = 0.067; // Diameter of the wheels in meters
 int pulses_per_revolution = 222;
+
+//
+
+int secretInstructions[10] = {3, -1, 2, 4, 1, 2, 5};
 
 // Variables for speed calculation
 long previous_ticks_R = 0;
@@ -122,49 +121,43 @@ bool entered_colour_sq = false;
 int left_bend_count = 0;
 int right_bend_count = 0;
 /////////////////////////////////////
-// variables for task 2 
+// variables for task 2
 
-int wallChecked = -1 ;
-int wallDetected= -1 ;
-bool wallDetectionFinished = false ;
-bool returnedToStart = false ;
-bool virtualBoxFinished = false ;
-bool braaughtToCheckpoint = false ;
+int wallChecked = -1;
+int wallDetected = -1;
+bool wallDetectionFinished = false;
+bool returnedToStart = false;
+bool virtualBoxFinished = false;
+bool braaughtToCheckpoint = false;
 
+///////////////////////////
 
+int VirtualInstructionsWall[2][8] = {{1, 2, 3, -1, 0, 7, 0, 9}, {1, 7, 1, 0, 7, 0, 9}};
 
-int VirtualInstructionsWall[2][8]={{1,2,3,-1,0,7,0,9},{1,7,1,0,7,0,9}} ;
-
-int VirtualInstructionsReturn[2][14]={{7,7,10},{7,7,7,-1,10}} ;
+int VirtualInstructionsReturn[2][14] = {{7, 7, 10}, {7, 7, 7, -1, 10}};
 
 int VirtualInstructionsFinish[2][5][19] = {
-  //close wall open
-  {
-    {1,-1,4,3,-1,-1,-1,2,11,100},
-    {8,1,1,4,7,11,100},
-   {-1,7,4,3,-1,-1,-1,4,7,11,100} ,
-   {-1,7,7,4,7,3,-1,-1,-1,4,7,11,100} ,
-    {-1,7,7,7,4,7,7,3,-1,-1,-1,4,7,11,100}
-  },
+    // close wall open
+    {
+        {1, -1, 4, 3, -1, -1, -1, 2, 11, 100},
+        {8, 1, 1, 4, 7, 11, 100},
+        {-1, 7, 4, 3, -1, -1, -1, 4, 7, 11, 100},
+        {-1, 7, 7, 4, 7, 3, -1, -1, -1, 4, 7, 11, 100},
+        {-1, 7, 7, 7, 4, 7, 7, 3, -1, -1, -1, 4, 7, 11, 100}},
 
-  //far wall open
-  {
-  {1,-1,4,7,7,3,-1,-1,-1,2,11,100},
-  {-1,2,7,3,1,1,1,4,7,11,100},
-  {-1,7,2,3,1,1,1,4,7,11,100},
-  {8,1,7,7,1,4,7,11,100},
-  {-1,7,7,7,4,3,-1,-1,-1,4,7,11,100}
-  
-}
-} ;
+    // far wall open
+    {
+        {1, -1, 4, 7, 7, 3, -1, -1, -1, 2, 11, 100},
+        {-1, 2, 7, 3, 1, 1, 1, 4, 7, 11, 100},
+        {-1, 7, 2, 3, 1, 1, 1, 4, 7, 11, 100},
+        {8, 1, 7, 7, 1, 4, 7, 11, 100},
+        {-1, 7, 7, 7, 4, 3, -1, -1, -1, 4, 7, 11, 100}
 
+    }};
 
-int VirCount = 0 ;
-int* currentInstruction = VirtualInstructionsWall[0];
-
-
-
-
+int VirCount = 0;
+int secCount = 0;
+int *currentInstruction = VirtualInstructionsWall[0];
 
 // variables for task 6
 
@@ -189,11 +182,15 @@ int path_4[4] = {2, 1, -1, 9};
 int path_5[4] = {2, 1, 0, -1};
 
 int *myarray[5] = {path_5, path_4, path_1, path_2, path_3};
-int checkZero(int barcode){
-  if(barcode==0){
-    return 0 ;
-  }else{
-    return 1 ;
+int checkZero(int barcode)
+{
+  if (barcode == 0)
+  {
+    return 0;
+  }
+  else
+  {
+    return 1;
   }
 }
 // Define the sizes of lists for each element
@@ -230,9 +227,6 @@ int instructionCount = 3;          // Total number of instructions
 bool stopRobot = false;
 int boxcount = 1;
 
-
-
-
 bool allSensorsDetectwhite(int sen[])
 {
   int sensorThresholds = 150;
@@ -248,20 +242,27 @@ bool allSensorsDetectwhite(int sen[])
 
 bool doted = false;
 
-void initializePins() {
-  for (int i = A0; i <= A15; i++) {
+int flag = 0;
+
+int* badass[8] = {1, 2, 1, 3, 4, 5, 4, 6};
+
+int kicks = 0;
+
+void initializePins()
+{
+  for (int i = A0; i <= A15; i++)
+  {
     pinMode(i, INPUT);
   }
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
   pinMode(R_encoder_A, INPUT);
   pinMode(L_encoder_A, INPUT);
-  pinMode(LEDpin,OUTPUT);
-  pinMode(switch1,INPUT_PULLUP);
-  pinMode(switch2,INPUT_PULLUP);
-  pinMode(switch3,INPUT_PULLUP);
-  pinMode(switch4,INPUT_PULLUP);
-
+  pinMode(LEDpin, OUTPUT);
+  pinMode(switch1, INPUT_PULLUP);
+  pinMode(switch2, INPUT_PULLUP);
+  pinMode(switch3, INPUT_PULLUP);
+  pinMode(switch4, INPUT_PULLUP);
 }
 
 // Encoder counting functions
@@ -277,21 +278,29 @@ void countL()
 
 void kUp()
 {
-  Kp += 0.1;
+  Accending = !Accending;
+  oledDisplay.displayText("Accending ", 1, 0, 0);
+  delay(200);
 }
 
 void kDown()
 {
-  Kp -= 0.1;
+
+  barcode -= 1;
+  oledDisplay.displayText("bar " + String(barcode), 1, 0, 0);
+  delay(200);
 }
 
-void LED(int status){
+void LED(int status)
+{
 
-  if(status){
-    digitalWrite(LEDpin,HIGH);
-
-  }else{
-    digitalWrite(LEDpin,LOW);
+  if (status)
+  {
+    digitalWrite(LEDpin, HIGH);
+  }
+  else
+  {
+    digitalWrite(LEDpin, LOW);
   }
 }
 
@@ -304,9 +313,6 @@ void setup()
   boxHandler.attachArm(7);     // Attach the arm servo to pin 10
 
   Serial.begin(9600);
-
-  
-
 
   // if (colorSensor.begin()) {
   //   Serial.println("TCS34725 found");
@@ -321,87 +327,81 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(L_encoder_A), countL, RISING);
 
   multiSensor.begin();
- 
-  oledDisplay.begin(); 
+
+  oledDisplay.begin();
   int value1 = digitalRead(switch1);
   int value2 = digitalRead(switch2);
   int value3 = digitalRead(switch3);
   int value4 = digitalRead(switch4);
 
- LED(1);
-    calibrate(whiteLineThresholds,0);
-    LED(0);
-    delay(10000);
-    LED(1);
-    calibrate(blackLineThresholds,1);
-    LED(0);
-    delay(10000);
-    
-  stage = value1*1 + value2*2 + value3*3 +value4*4;
+  LED(1);
+  calibrate(whiteLineThresholds, 0);
+  LED(0);
+  delay(10000);
+  LED(1);
+  calibrate(blackLineThresholds, 1);
+  LED(0);
+  delay(10000);
 
-  oledDisplay.displayText("Stage : " + String(stage),1.5,0,0);
+  stage = value1 * 1 + value2 * 2 + value3 * 3 + value4 * 4;
+
+  oledDisplay.displayText("Stage : " + String(stage), 1.5, 0, 0);
 
   // int sensorThresholds =  calibrate(sensors);
-  //oledDisplay.displayText(String(sensorThresholds),1,0,20);
+  // oledDisplay.displayText(String(sensorThresholds),1,0,20);
   delay(1000);
 
-
-  
-/*
-  while (decoded_num == -1)
-  {
-    //read barcode
-
-
-    }
-
-    while (entered_colour_sq == false)
+  /*
+    while (decoded_num == -1)
     {
-      int direction = detectBend();
-
-
-      if(decoded_num == 0){
-        while (left_bend_count < 2)
-        {
-          irReader.readSensors(sensors);
-          irReader.convertSensorsToBinary(sensors, binarySensors);
-          direction = detectBend();
-          processLineFollowing(binarySensors);
-        }
-        motor.stopRobot();
-        direction = -1;
-        //turn on led
-
-        while (direction != 1)
-        {
-          irReader.readSensors(sensors);
-          irReader.convertSensorsToBinary(sensors, binarySensors);
-          direction = detectBend();
-          processLineFollowing(binarySensors);
-        }
-        motor.stopRobot();
-        //turn off led
-        turn180();
-        motor.stopRobot();
-
-        //L_encoder_ticks=0;
-        //R_encoder_ticks=0;
-
-        entered_colour_sq = true;
+      //read barcode
 
 
       }
 
-
-*/    
-    
-  }   
-  
+      while (entered_colour_sq == false)
+      {
+        int direction = detectBend();
 
 
-  
+        if(decoded_num == 0){
+          while (left_bend_count < 2)
+          {
+            irReader.readSensors(sensors);
+            irReader.convertSensorsToBinary(sensors, binarySensors);
+            direction = detectBend();
+            processLineFollowing(binarySensors);
+          }
+          motor.stopRobot();
+          direction = -1;
+          //turn on led
 
-void moveDistance(float distance, int speed) {
+          while (direction != 1)
+          {
+            irReader.readSensors(sensors);
+            irReader.convertSensorsToBinary(sensors, binarySensors);
+            direction = detectBend();
+            processLineFollowing(binarySensors);
+          }
+          motor.stopRobot();
+          //turn off led
+          turn180();
+          motor.stopRobot();
+
+          //L_encoder_ticks=0;
+          //R_encoder_ticks=0;
+
+          entered_colour_sq = true;
+
+
+        }
+
+
+  */
+}
+
+void moveDistance(float distance, int speed)
+{
 
   // Calculate the number of pulses required for the given distance
   long pulses_needed = (distance / (PI * wheel_diameter)) * pulses_per_revolution;
@@ -458,8 +458,10 @@ void turnBend(byte direction)
   }
 }
 
-bool junctionDetected(int binarySensors[]) {
-  if ((binarySensors[0]&&binarySensors[1])||((binarySensors[11]&&binarySensors[10]))) {
+bool junctionDetected(int binarySensors[])
+{
+  if ((binarySensors[0] && binarySensors[1]) || (binarySensors[11] && binarySensors[10]))
+  {
     return true;
   }
   else
@@ -552,7 +554,6 @@ void turn180right()
   }
 }
 
-
 void straightMove(int base_speed)
 {
 
@@ -577,56 +578,63 @@ void straightMove(int base_speed)
 
   pid_previous_error = pid_error;
 }
-int moveTilBend(){
-  int bendDirection = -1 ;
-  while( bendDirection == -1){
-    bendDirection = detectBend() ;
+int moveTilBend()
+{
+  int bendDirection = -1;
+  while (bendDirection == -1)
+  {
+    bendDirection = detectBend();
     processLineFollowing(binarySensors);
   }
-  return bendDirection ; 
+  return bendDirection;
 }
 
-
-int processSensorHistory(int senHistory[]) {
-  int barcodeNumber = 0 ; 
-  int outCount = 0 ;
+int processSensorHistory(int senHistory[])
+{
+  int barcodeNumber = 0;
+  int outCount = 0;
   int consecutiveCount = 0;
 
-  for (int i = 0; i < historySize; i++) {
-    if (senHistory[i] == 1) {
+  for (int i = 0; i < historySize; i++)
+  {
+    if (senHistory[i] == 1)
+    {
       consecutiveCount++;
-    } else {
-      if(consecutiveCount > 0  && consecutiveCount < 10){
+    }
+    else
+    {
+      if (consecutiveCount > 0 && consecutiveCount < 10)
+      {
         outputArray[outCount] = 0;
         outCount++;
-      }else if(consecutiveCount > 10){
+      }
+      else if (consecutiveCount > 10)
+      {
         outputArray[outCount] = 1;
         outCount++;
       }
-        consecutiveCount = 0;
-      }
-      
-      
+      consecutiveCount = 0;
+    }
   }
 
-  for (int k = 0 ; k < 8 ; k++){
+  for (int k = 0; k < 8; k++)
+  {
     Serial.println("");
     Serial.print(outputArray[k]);
     barcodeNumber = barcodeNumber + outputArray[k] * (1 << (7 - k));
-
-    
   }
   oledDisplay.displayText(String(barcodeNumber));
   delay(2000);
-  return (barcodeNumber % 5) ;
-
+  return (barcodeNumber % 5);
 }
 
-void decodeBarcode(){
-  colour = 0 ;
-    irReader.setColour(colour);
+void decodeBarcode()
+{
+  colour = 0;
+  irReader.setColour(colour);
 
-    while (historyIndex < historySize) {
+  while (historyIndex < historySize)
+  {
     straightMove(60);
     delay(40);
     // Read sensors
@@ -635,42 +643,51 @@ void decodeBarcode(){
 
     // Calculate the sum of binary sensors
     int sum = 0;
-    for (int i = 0; i < 12; i++) {
-        sum += binarySensors[i];
+    for (int i = 0; i < 12; i++)
+    {
+      sum += binarySensors[i];
     }
 
     // Update sensor history based on the sum
-    if (sum > 10) {
-        senHistory[historyIndex] = 1; // White line
-    }  else {
+    if (sum > 10)
+    {
+      senHistory[historyIndex] = 1; // White line
+    }
+    else
+    {
       senHistory[historyIndex] = 0;
     }
     Serial.print(senHistory[historyIndex]);
 
-    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1|| binarySensors[10] == 1 || binarySensors[1] == 1) ) {
-    testCount = testCount+1 ;
-  }else{
-    testCount = 0 ;
-  }
+    if ((binarySensors[0] == 0 && binarySensors[11] == 0) && (binarySensors[5] == 1 || binarySensors[6] == 1 || binarySensors[4] == 1 || binarySensors[7] == 1 || binarySensors[3] == 1 || binarySensors[8] == 1 || binarySensors[2] == 1 || binarySensors[9] == 1 || binarySensors[10] == 1 || binarySensors[1] == 1))
+    {
+      testCount = testCount + 1;
+    }
+    else
+    {
+      testCount = 0;
+    }
 
-    if (testCount > 6 ){
+    if (testCount > 6)
+    {
       motor.stopRobot();
       delay(500);
-      historyIndex = historySize+1 ;
+      historyIndex = historySize + 1;
       break;
     }
 
     historyIndex++;
-}
-motor.stopRobot();
-barcode = processSensorHistory(senHistory);
-oledDisplay.displayText(String(barcode));
-delay(500);
-irReader.setColour(0);
-stage = 2; 
+  }
+  motor.stopRobot();
+  barcode = processSensorHistory(senHistory);
+  oledDisplay.displayText(String(barcode));
+  delay(500);
+  irReader.setColour(0);
+  stage = 2;
 }
 
-int nextBox(int a, int b) {
+int nextBox(int a, int b)
+{
   int sumOfSet = 1 + 2 + 3;
   return sumOfSet - (a + b);
 }
@@ -701,647 +718,782 @@ void updateDistances()
   // Get the distances from the multi-sensor library
   int *distances = multiSensor.getDistances();
 
-    // Copy the distances to the shared array
-    for (int i = 0; i < 4; i++) {
-        sensorDistances[i] = distances[i];
-    }
+  // Copy the distances to the shared array
+  for (int i = 0; i < 4; i++)
+  {
+    sensorDistances[i] = distances[i];
+  }
 }
 
+void followVirtualInstructions(int currentInstruction[14])
+{
+  if (junctionDetected(binarySensors))
+  {
+    motor.stopRobot();
+    oledDisplay.displayText("Vir count" + String(VirCount), 1, 0, 0);
+    delay(200);
 
+    switch (currentInstruction[VirCount])
+    {
+    case 2:
+      LED(1);
+      moveDistance(0.04, 65);
+      break;
+    case 3:
+      moveDistance(0.04, 65);
+      LED(0);
+      moveDistance(0.04, -65);
+      turn180right();
+      moveDistance(0.05, -65);
+      break;
+    case -1:
+      moveDistance(0.03, 65);
+      turnBend(0);
+      moveDistance(0.03, -65);
+      break;
+    case 1:
+      moveDistance(0.03, 65);
+      turnBend(1);
+      moveDistance(0.03, -65);
+      break;
+    case 4:
+      moveDistance(0.03, -65);
+      turn180right();
+      moveDistance(0.17, -65);
+      LED(1);
+      moveDistance(0.04, 65);
+      break;
+    case 5:
+      moveDistance(0.03, 65);
+      LED(1);
+      moveDistance(0.04, 65);
+      break;
+    case 6:
+      moveDistance(0.03, 65);
+      LED(0);
+      motor.stopRobot();
+      break;
+    case 7:
+      moveDistance(0.04, 65);
+      break;
+    case 8:
+      turn180right();
+      break;
+    case 9:
+      motor.stopRobot();
+      wallDetectionFinished = true;
+      oledDisplay.displayText(("wall " + String(wallDetected)), 1, 0, 0);
+      if (wallDetected == 0)
+      {
+        Accending = true;
+      }
+      else
+      {
+        Accending = false;
+      }
+      delay(1000);
+      turn180left();
+      moveDistance(0.05, -65);
+      VirCount = -1;
+      break;
+    case 10:
+      motor.stopRobot();
+      returnedToStart = true;
+      VirCount = -1;
+      delay(200);
+      break;
+    case 100:
+      motor.stopRobot();
+      VirCount = -1;
+      virtualBoxFinished = true;
+      stage = 4;
+      break;
+    case 11:
+      moveDistance(0.08, 65);
+      motor.stopRobot();
+      LED(0);
+      break;
+      break;
+    case 0: // Go straight
+      motor.stopRobot();
+      moveDistance(0.05, 70);
+      wallChecked++;
+      const int iterations = 7;
+      int distancesBottom[iterations];
+      int distancesMiddle[iterations];
 
-void followVirtualInstructions(int currentInstruction[14]){
-    if(junctionDetected( binarySensors)){
-          motor.stopRobot();
-          oledDisplay.displayText("Vir count"+ String(VirCount),1,0,0);
-          delay(200);
-         
-          switch(currentInstruction[VirCount]){
-            case 2 :
-            LED(1);
-            moveDistance(0.04,65);
-            break;
-            case 3:
-            moveDistance(0.04,65);
-            LED(0);
-            moveDistance(0.04,-65);
-            turn180right();
-            moveDistance(0.05,-65);
-            break;
-            case -1 :
-            moveDistance(0.03,65);
-            turnBend(0);
-            moveDistance(0.03,-65);
-            break;
-            case 1:
-            moveDistance(0.03,65);
-            turnBend(1);
-            moveDistance(0.03,-65);
-            break;
-            case 4 :
-            moveDistance(0.03,-65);
-            turn180right();
-            moveDistance(0.17,-65);
-            LED(1);
-            moveDistance(0.04,65);
-            break;
-            case 5:
-            moveDistance(0.03,65);
-            LED(1);
-            moveDistance(0.04,65);
-            break;
-            case 6:
-            moveDistance(0.03,65);
-            LED(0);
-            motor.stopRobot();
-            break;
-            case 7:
-            moveDistance(0.04,65);
-            break;
-            case 8 :
-            turn180right();
-            break;
-            case 9:
-            motor.stopRobot();
-            wallDetectionFinished = true ;
-            oledDisplay.displayText(("wall "+String(wallDetected)),1,0,0);
-            if(wallDetected == 0){
-              Accending = true;
-            }else{
-              Accending = false;
-            }
-            delay(1000);
-            turn180left();
-            moveDistance(0.05,-65);
-            VirCount=-1;
-            break;
-            case 10 :
-            motor.stopRobot();
-            returnedToStart = true ;
-            VirCount=-1;
-            delay(200);
-            break;
-            case 100:
-            motor.stopRobot();
-            VirCount = -1 ;
-            virtualBoxFinished=true;
-            break;
-            case 11:
-            moveDistance(0.08,65);
-            motor.stopRobot();
-            LED(0);
-            break ; 
-            break ;
-            case 0 :// Go straight
-            motor.stopRobot();
-            moveDistance(0.05,70);
-            wallChecked++ ;
-            const int iterations = 7;
-            int distancesBottom[iterations];
-            int distancesMiddle[iterations];
-            
-
-            for (int i = 0; i < iterations; i++) {
-              updateDistances();
-              
-
-              distancesBottom[i] = sensorDistances[1];
-              distancesMiddle[i] = sensorDistances[2];
-              
-
-            }
-              sortArray(distancesBottom, iterations);
-            sortArray(distancesMiddle, iterations);
-
-            int medianBottom = distancesBottom[iterations / 2];
-            int medianMiddle = distancesMiddle[iterations / 2];
-            
-            if (medianBottom < 700 ){
-            
-              wallDetected = wallChecked ;
-              oledDisplay.displayText(("wall detected"+String(wallDetected)),1,0,0);
-              delay(200);
-            }
-            break;
-            
-
-            
-          }
-          motor.stopRobot();
-          delay(500);
-          VirCount ++ ;
-        }else{
-            processLineFollowing(binarySensors);
-        }
-}
-
-
-void loop() {
-  switch (stage) {
-    case 0 :
-
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors,binarySensors);
-    oledDisplay.displayText(irValues_str,1,0,0);
-
-    
-    break;
-
-        case 1:
-            decodeBarcode();
-            break;
-
-        // stage 2
-        case 2:
-            while (true) {
-                irReader.readSensors(sensors);
-                irReader.convertSensorsToBinary(sensors, binarySensors);
-                if (wallDetectionFinished == false) {
-                    currentInstruction = VirtualInstructionsWall[checkZero(barcode)];
-                } else {
-                    if (returnedToStart == false) {
-                        currentInstruction = VirtualInstructionsReturn[checkZero(barcode)];
-                    } else {
-                        currentInstruction = VirtualInstructionsFinish[1 - wallDetected][barcode];
-
-                        if (virtualBoxFinished) {
-                            motor.stopRobot();
-                            stage = 4;
-                            delay(1000);
-                            moveDistance(0.15, 65);
-                        }
-                    }
-                }
-
-                followVirtualInstructions(currentInstruction);
-            }
-
-        case 3:
-            irReader.setColour(1);
-
-            if (releases == 3) {
-                irReader.readSensors(sensors);
-                irReader.convertSensorsToBinary(sensors, binarySensors);
-
-                if (junctionDetected(sensors)) {
-                    motor.stopRobot();
-                    delay(500);
-                    moveDistance(0.08, 65);
-                    turnBend(1);
-                    stage = 7; // Transition to stage 8
-                } else {
-                    processLineFollowing(binarySensors);
-                }
-            } else {
-                while (releases < 3) {
-                    oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
-                    oledDisplay.displayText("stage 3 " + String(instruction[currentInstructionIndex]), 1, 0, 30);
-                    oledDisplay.displayText("aneem " + String(currentInstructionIndex), 1, 0, 50);
-                    irReader.readSensors(sensors);
-                    irReader.convertSensorsToBinary(sensors, binarySensors);
-
-                    // Process line following until all sensors detect white
-                    if (instruction[currentInstructionIndex] == 5 && allSensorsDetectwhite(sensors)) {
-                        // Reset the current instruction index
-                        currentInstructionIndex = 0;
-
-                      // Update the instruction array
-                      int* newInstructions = definepath(boxcount, places[boxcount-1]);
-                      for (int i = 0; i < 4; i++) {
-                          instruction[i] = newInstructions[i];
-                      }
-
-                      // Update the instruction count
-                      instructionCount = sizes[boxcount-1][places[boxcount]-1];
-
-                      
-
-                    break;
-                }
-
-                    if (pick_box && allSensorsDetectwhite(sensors)) {
-                        motor.stopRobot();
-                        boxHandler.lowerArm();
-                        boxHandler.releaseBox();
-                        moveDistance(0.04, -65);
-                        turn180right();
-                        moveDistance(0.04, -65);
-
-                        releases++;
-                        pick_box = false;
-
-                        int* new_instruction = backpath(boxcount + 1, places[boxcount - 1]);
-                        instructionCount = sizes[places[boxcount - 1] - 1][boxcount - 1];
-                        for (int i = 0; i < 4; i++) {
-                            instruction[i] = new_instruction[i];
-                        }
-                        currentInstructionIndex = 0;
-                        oledDisplay.displayText("back " + String(currentInstructionIndex), 1, 0, 0);
-                        oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
-
-                        boxcount++;
-
-                        break; // Exit the loop
-                    }
-
-                    // Check if a junction or bend is detected
-                    if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2) {
-                        motor.stopRobot();
-                        delay(500); // Wait for 0.5 seconds
-
-                        // Process the current instruction based on the instruction array
-                        switch (instruction[currentInstructionIndex]) {
-                            case 2:
-                                boxHandler.grabBox();
-                                boxHandler.liftBox();
-                                moveDistance(0.04, -65);
-                                turn180right();
-                                moveDistance(0.04, -65);
-                                oledDisplay.displayText("hiiii " + String(currentInstructionIndex), 1, 0, 20);
-                                pick_box = true;
-                                break;
-                            case -1:
-                                // Turn left
-                                moveDistance(0.02, 65);
-                                turnBend(0);
-                                break;
-                            case 0:
-                                // Go straight
-                                if (instruction[currentInstructionIndex + 1] == 3) {
-                                    motor.stopRobot();
-                                    moveDistance(0.05, 70);
-
-                                    const int iterations = 7;
-                                    int distancesBottom[iterations];
-                                    int distancesMiddle[iterations];
-                                    int distancesTop[iterations];
-
-                                    // Collect data for 3 iterations
-                                    for (int i = 0; i < iterations; i++) {
-                                        updateDistances();
-                                        distancesBottom[i] = sensorDistances[1];
-                                        distancesMiddle[i] = sensorDistances[2];
-                                        distancesTop[i] = sensorDistances[3];
-                                    }
-
-                                    sortArray(distancesBottom, iterations);
-                                    sortArray(distancesMiddle, iterations);
-                                    sortArray(distancesTop, iterations);
-
-                                    // Get the median (middle) value
-                                    int medianBottom = distancesBottom[iterations / 2];
-                                    int medianMiddle = distancesMiddle[iterations / 2];
-                                    int medianTop = distancesTop[iterations / 2];
-
-                                    oledDisplay.displayText(String(medianBottom) + " " + String(medianMiddle) + " " + String(medianTop), 1, 0, 20);
-
-                                    if (medianTop < 400) {
-                                        box = 3;
-                                    } else if (medianMiddle < 400) {
-                                        box = 2;
-                                    } else {
-                                        box = 1;
-                                    }
-
-                                    if (!Accending) {
-                                        places[box_count] = 4 - box;
-                                    } else {
-                                        places[box_count] = box;
-                                    }
-
-                                    if (box_count == 0) {
-                                        moveDistance(0.03, 65);
-                                    }
-                                    oledDisplay.displayText("box " + String(box) + " box count " + String(box_count), 1, 0, 0);
-
-                                    box_count++;
-
-                                    if (box_count == 2) {
-                                        places[box_count] = nextBox(places[0], places[1]);
-                                        motor.stopRobot();
-                                        delay(1000);
-                                        moveDistance(0.03, -65);
-                                        currentInstructionIndex = -1;
-                                        instructionCount = 2;
-                                        instruction[0] = 1;
-                                        instruction[1] = 5;
-                                        instruction[2] = 9;
-                                        instruction[3] = 9;
-                                        oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
-                                        turn180left();
-                                        moveDistance(0.15, -65);
-
-                                        delay(500);
-                                        break;
-                                    }
-                                    currentInstructionIndex++;
-                                    break;
-                                } else {
-                                    moveDistance(0.04, 65);
-                                }
-                                break;
-                            case 1:
-                                // Turn right
-                                moveDistance(0.02, 65);
-                                turnBend(1);
-                                break;
-                            default:
-                                processLineFollowing(binarySensors);
-                                break;
-                        }
-                        currentInstructionIndex++;
-                    } else {
-                        // Process line-following logic when no junction or bend is detected
-                        processLineFollowing(binarySensors);
-                    }
-                }
-            }
-            break;
-
-       case 5:
+      for (int i = 0; i < iterations; i++)
+      {
         updateDistances();
 
+        distancesBottom[i] = sensorDistances[1];
+        distancesMiddle[i] = sensorDistances[2];
+      }
+      sortArray(distancesBottom, iterations);
+      sortArray(distancesMiddle, iterations);
 
-        oledDisplay.displayText("stage 5",1,0,0);
-       
-        // Get the distances array
-      
+      int medianBottom = distancesBottom[iterations / 2];
+      int medianMiddle = distancesMiddle[iterations / 2];
 
+      if (medianBottom < 700)
+      {
 
+        wallDetected = wallChecked;
+        oledDisplay.displayText(("wall detected" + String(wallDetected)), 1, 0, 0);
+        delay(200);
+      }
+      break;
+    }
+    motor.stopRobot();
+    delay(500);
+    VirCount++;
+  }
+  else
+  {
+    processLineFollowing(binarySensors);
+  }
+}
 
-       
-        oledDisplay.displayText( "Wait for gate close " +String(sensorDistances[0]),1,0,0);
-        delay(200); 
-        while (sensorDistances[0]>=100) {
-          updateDistances();
-            motor.stopRobot(); 
-            delay(50);   // Short delay before rechecking
-        }
+void followSecretInstrucions(int currentInstruction[14])
+{
 
-        // Now wait for the next time the gate opens
-        oledDisplay.displayText("Gate closed",2,0,0);
-        delay(200); 
-        while (sensorDistances[0]<=100) {
-          updateDistances();
-            motor.stopRobot(); 
-            delay(50);   // Short delay before rechecking
-        }
+  if (junctionDetected(binarySensors))
+  {
+    motor.stopRobot();
+    oledDisplay.displayText("Vir count" + String(VirCount), 1, 0, 0);
+    delay(200);
 
-    // Move through the gate quickly
-        oledDisplay.displayText("Gate Opened",2,0,0);
-        delay(1000);
-        moveDistance(0.35,120);
-        motor.stopRobot();
-        stage = 3;
-        break;
+    switch (currentInstruction[VirCount])
+    {
+    case 2:
+      moveDistance(0.06, 65);
+      break;
 
-        case 8:
+    case 3:
+      moveDistance(0.02, 65);
+      turnBend(0);
+      moveDistance(0.03, -65);
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+      while (binarySensors[5] != 0 || binarySensors[6] != 0 || binarySensors[4] != 0 || binarySensors[7] != 0)
+      {
+        processLineFollowing(binarySensors);
+      }
+      boxHandler.grabBox();
+      boxHandler.liftBox();
+      turn180right();
+      moveDistance(0.05, -65);
+      break;
+    case -1:
+      moveDistance(0.02, 65);
+      turnBend(0);
+      moveDistance(0.03, -65);
+      break;
+    case 1:
+      moveDistance(0.02, 65);
+      turnBend(1);
+      moveDistance(0.03, -65);
+      break;
+    case 4:
+      moveDistance(0.03, 65);
+      turnBend(1);
+      while (binarySensors[5] != 0 || binarySensors[6] != 0 || binarySensors[4] != 0 || binarySensors[7] != 0)
+      {
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+        processLineFollowing(binarySensors);
+      }
+
+      moveDistance(0.04, 60);
+      moveDistance(0.04, -60);
+      turnBend(0);
+      turn180right();
+      turnBend(1);
+      boxHandler.liftBox();
+      turn180right();
+      break;
+    case 5:
+      moveDistance(0.10, 65);
+      boxHandler.lowerArm();
+      boxHandler.releaseBox();
+      moveDistance(0.07, -65);
+      boxHandler.grabBox();
+      moveDistance(0.17, 60);
+      moveDistance(0.07, -65);
+      turn180right();
+      break;
+    }
+    motor.stopRobot();
+    delay(500);
+    secCount++;
+  }
+  else
+  {
+    processLineFollowing(binarySensors);
+  }
+}
+
+void loop()
+{
+  oledDisplay.displayText("Stage " + String(stage), 1, 0, 0);
+
+  switch (stage)
+  {
+  case 0:
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
-    //oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
-    processLineFollowing(binarySensors);
-    oledDisplay.displayText(String(bendNumber) ,2,0,0);
+    oledDisplay.displayText(irValues_str, 1, 0, 0);
+    break;
 
-    if(junctionDetected(binarySensors) ){ 
+  case 1:
+    decodeBarcode();
+    break;
+
+  case 2:
+    if (virtualBoxFinished)
+    {
+      motor.stopRobot();
+      stage = 4;
+      delay(1000);
+      moveDistance(0.15, 65);
+      break;
+    }
+    while (true)
+    {
+      if (virtualBoxFinished)
+      {
+        motor.stopRobot();
+        stage = 4;
+        delay(1000);
+        moveDistance(0.15, 65);
+        break;
+      }
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+      if (wallDetectionFinished == false)
+      {
+        currentInstruction = VirtualInstructionsWall[checkZero(barcode)];
+      }
+      else
+      {
+        if (returnedToStart == false)
+        {
+          currentInstruction = VirtualInstructionsReturn[checkZero(barcode)];
+        }
+        else
+        {
+          currentInstruction = VirtualInstructionsFinish[1 - wallDetected][barcode];
+        }
+      }
+      if (virtualBoxFinished)
+      {
+        motor.stopRobot();
+        stage = 4;
+        delay(1000);
+        moveDistance(0.15, 65);
+        break;
+      }
+
+      followVirtualInstructions(currentInstruction);
+    }
+    break;
+
+  case 4:
+    irReader.setColour(0);
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+
+    if (allSensorsDetectwhite(sensors))
+    {
+      motor.stopRobot();
+      delay(1000);
+      moveDistance(0.06, 65);
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+      if (allSensorsDetectwhite(sensors))
+      {
+        motor.stopRobot();
+        delay(1000);
+        stage = 6;
+      }
+    }
+    else
+    {
+      processLineFollowing(binarySensors);
+    }
+    break;
+
+  case 3:
+    irReader.setColour(1);
+
+    if (releases == 3)
+    {
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+
+      if (junctionDetected(sensors))
+      {
+        motor.stopRobot();
+        delay(500);
+        moveDistance(0.08, 65);
+        turnBend(1);
+        scape_bend = 3 - places[2];
+
+        stage = 7; // Transition to stage 8
+      }
+      else
+      {
+        processLineFollowing(binarySensors);
+      }
+    }
+    else
+    {
+      while (releases < 3)
+      {
+        oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
+        oledDisplay.displayText("stage 3 " + String(instruction[currentInstructionIndex]), 1, 0, 30);
+        oledDisplay.displayText("aneem " + String(currentInstructionIndex), 1, 0, 50);
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
+
+        if (instruction[currentInstructionIndex] == 5 && allSensorsDetectwhite(sensors))
+        {
+          currentInstructionIndex = 0;
+          int *newInstructions = definepath(boxcount, places[boxcount - 1]);
+          for (int i = 0; i < 4; i++)
+          {
+            instruction[i] = newInstructions[i];
+          }
+          instructionCount = sizes[boxcount - 1][places[boxcount] - 1];
+          break;
+        }
+
+        if (pick_box && allSensorsDetectwhite(sensors))
+        {
+          motor.stopRobot();
+          boxHandler.lowerArm();
+          boxHandler.releaseBox();
+          moveDistance(0.04, -65);
+          turn180right();
+          moveDistance(0.04, -65);
+
+          releases++;
+          pick_box = false;
+
+          int *new_instruction = backpath(boxcount + 1, places[boxcount - 1]);
+          instructionCount = sizes[places[boxcount - 1] - 1][boxcount - 1];
+          for (int i = 0; i < 4; i++)
+          {
+            instruction[i] = new_instruction[i];
+          }
+          currentInstructionIndex = 0;
+          oledDisplay.displayText("back " + String(currentInstructionIndex), 1, 0, 0);
+          oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
+
+          boxcount++;
+          break;
+        }
+
+        if (junctionDetected(binarySensors) || instruction[currentInstructionIndex] == 2)
+        {
+          motor.stopRobot();
+          delay(500);
+
+          switch (instruction[currentInstructionIndex])
+          {
+          case 2:
+            boxHandler.grabBox();
+            boxHandler.liftBox();
+            moveDistance(0.04, -65);
+            turn180right();
+            moveDistance(0.04, -65);
+            oledDisplay.displayText("hiiii " + String(currentInstructionIndex), 1, 0, 20);
+            pick_box = true;
+            break;
+          case -1:
+            moveDistance(0.02, 65);
+            turnBend(0);
+            break;
+          case 0:
+            if (instruction[currentInstructionIndex + 1] == 3)
+            {
+              motor.stopRobot();
+              moveDistance(0.05, 70);
+
+              const int iterations = 7;
+              int distancesBottom[iterations];
+              int distancesMiddle[iterations];
+              int distancesTop[iterations];
+
+              for (int i = 0; i < iterations; i++)
+              {
+                updateDistances();
+                distancesBottom[i] = sensorDistances[1];
+                distancesMiddle[i] = sensorDistances[2];
+                distancesTop[i] = sensorDistances[3];
+              }
+
+              sortArray(distancesBottom, iterations);
+              sortArray(distancesMiddle, iterations);
+              sortArray(distancesTop, iterations);
+
+              int medianBottom = distancesBottom[iterations / 2];
+              int medianMiddle = distancesMiddle[iterations / 2];
+              int medianTop = distancesTop[iterations / 2];
+
+              oledDisplay.displayText(String(medianBottom) + " " + String(medianMiddle) + " " + String(medianTop), 1, 0, 20);
+
+              if (medianTop < 400)
+              {
+                box = 3;
+              }
+              else if (medianMiddle < 400)
+              {
+                box = 2;
+              }
+              else
+              {
+                box = 1;
+              }
+
+              if (!Accending)
+              {
+                places[box_count] = 4 - box;
+              }
+              else
+              {
+                places[box_count] = box;
+              }
+
+              if (box_count == 0)
+              {
+                moveDistance(0.03, 65);
+              }
+              oledDisplay.displayText("box " + String(box) + " box count " + String(box_count), 1, 0, 0);
+
+              box_count++;
+
+              if (box_count == 2)
+              {
+                places[box_count] = nextBox(places[0], places[1]);
+                motor.stopRobot();
+                delay(1000);
+                moveDistance(0.03, -65);
+                currentInstructionIndex = -1;
+                instructionCount = 2;
+                instruction[0] = 1;
+                instruction[1] = 5;
+                instruction[2] = 9;
+                instruction[3] = 9;
+                oledDisplay.displayText("stage 3 " + String(instruction[0]) + " " + String(instruction[1]) + " " + String(instruction[2]) + " " + String(instruction[3]), 1, 0, 0);
+                turn180left();
+                moveDistance(0.15, -65);
+
+                delay(500);
+                break;
+              }
+              currentInstructionIndex++;
+              break;
+            }
+            else
+            {
+              moveDistance(0.04, 65);
+            }
+            break;
+          case 1:
+            moveDistance(0.02, 65);
+            turnBend(1);
+            break;
+          default:
+            processLineFollowing(binarySensors);
+            break;
+          }
+          currentInstructionIndex++;
+        }
+        else
+        {
+          processLineFollowing(binarySensors);
+        }
+      }
+    }
+    break;
+
+  case 5:
+    updateDistances();
+    LED(1);
+    oledDisplay.displayText("stage 5", 1, 0, 0);
+
+    oledDisplay.displayText("Wait for gate close " + String(sensorDistances[0]), 1, 0, 0);
+    delay(200);
+    while (sensorDistances[0] >= 100)
+    {
+      updateDistances();
+      motor.stopRobot();
+      delay(50);
+    }
+
+    oledDisplay.displayText("Gate closed", 2, 0, 0);
+    delay(200);
+    while (sensorDistances[0] <= 100)
+    {
+      updateDistances();
+      motor.stopRobot();
+      delay(50);
+    }
+
+    oledDisplay.displayText("Gate Opened", 2, 0, 0);
+    delay(1000);
+    moveDistance(0.35, 120);
+    motor.stopRobot();
+    stage = 3;
+    break;
+
+  case 8:
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    processLineFollowing(binarySensors);
+    oledDisplay.displayText(String(bendNumber), 2, 0, 0);
+
+    if (junctionDetected(binarySensors))
+    {
       LED(1);
       delay(500);
       LED(0);
       bendNumber++;
-       
-       switch (bendNumber) {
-            case 1:
-                
 
-                
-            moveDistance(0.04,65);                
-            motor.stopRobot();
-            delay(1000);
+      switch (bendNumber)
+      {
+      case 1:
+        moveDistance(0.04, 65);
+        motor.stopRobot();
+        delay(1000);
+        turnBend(0);
+        moveDistance(0.02, 65);
+        break;
 
-            turnBend(0);
+      case 2:
+        motor.stopRobot();
+        delay(2000);
+        turnBend(0);
+        break;
 
-            moveDistance(0.02,65);
+      case 3:
+        boxHandler.grabBox();
+        boxHandler.liftBox();
+        turn180left();
+        break;
 
-            
-
-                        
-            break;
-
-            case 2:
-            //oledDisplay.displayText(String(bendNumber) ,2,0,0);
-            motor.stopRobot();
-            delay(2000);
-            turnBend(0);
-          
-                        
-                        // while(!allSensorsDetectwhite(sensors)){
-                        //   irReader.readSensors(sensors);
-                        // irReader.convertSensorsToBinary(sensors, binarySensors);
-                        // //oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
-                        // processLineFollowing(binarySensors);
-                        // }
-                        // motor.stopRobot();
-                        // delay(500);
-                        // boxHandler.grabBox();
-                        // boxHandler.liftBox();
-                break;
-
-            case 3:
-                //oledDisplay.displayText(String(bendNumber) ,2,0,0);
-                boxHandler.grabBox();
-                boxHandler.liftBox();
-                turn180left();
-                
-
-                        
-                break;
-
-            case 4:
-                turnBend(1);
-                bendNumber+= 1;
-                
-                        
-                break; 
-
-
-                    }
-
-
-     }
-    
-
-    
-
-
-
-
-
+      case 4:
+        turnBend(1);
+        bendNumber += 1;
+        break;
+      }
+    }
     break;
 
-        default:
-            irReader.readSensors(sensors);
-            irReader.convertSensorsToBinary(sensors, binarySensors);
-            processLineFollowing(binarySensors);
-            break;
-    
-    case 4 :
-            irReader.setColour(0);
-            irReader.readSensors(sensors);
-            irReader.convertSensorsToBinary(sensors, binarySensors);
-            if(allSensorsDetectwhite(sensors)){
-              motor.stopRobot();
-              delay(1000);
-              moveDistance(0.06 , 65);
-              irReader.readSensors(sensors);
-              irReader.convertSensorsToBinary(sensors, binarySensors);
-              if(allSensorsDetectwhite(sensors)){
-                motor.stopRobot();
-                delay(1000);
-                stage = 6 ;
+  case 6:
+    moveDistance(0.10, 65);
+    while (true)
+    {
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+      if (allSensorsDetectwhite(sensors))
+      {
+        motor.stopRobot();
+        delay(1000);
+        stage = 5;
+        break;
+      }
+      else
+      {
+        processLineFollowing(binarySensors);
+      }
+    }
+    break;
 
-              }
-            }else{
-            processLineFollowing(binarySensors);}
+  case 7:
+    irReader.setColour(0);
+    int junctionCount = 0;
 
-    break ;
-    
-    
+    while (junctionCount < scape_bend)
+    {
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
+      processLineFollowing(binarySensors);
 
+      if (junctionDetected(binarySensors))
+      {
+        junctionCount++;
+        delay(100);
+      }
+    }
 
-    case 6:
-    moveDistance(0.08, 65);
-    while (true){
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-    if (allSensorsDetectwhite(sensors)){
-      motor.stopRobot();
-      moveDistance(0.04, -65);
-      motor.stopRobot();
-      delay(1000);
-      stage = 5;
-    }else{
+    while (!allSensorsDetectBlack(sensors))
+    {
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
       processLineFollowing(binarySensors);
     }
-    }
+
+    motor.stopRobot();
+    stage = 8;
     break;
-    case 7 : 
-    irReader.setColour(0);
+
+  case 9:
+    
+irReader.setColour(1);
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
-    processLineFollowing(binarySensors); 
 
-            processLineFollowing(binarySensors);
-            break;
+    while (true) {
+        irReader.readSensors(sensors);
+        irReader.convertSensorsToBinary(sensors, binarySensors);
 
-    case 9 :// padda padda yana eka 
-    irReader.setColour(1);
+        if (junctionDetected(binarySensors) || allSensorsDetectwhite(binarySensors)) {
+          
+            switch (badass(kicks)) {
+                case 1:
+                    moveDistance(0.03, 65);
+                    turnBend(0);
+                    break;
+                case 2:
+                    motor.stopRobot();
+                    delay(1000);
+                    boxHandler.grabBox();
+                    boxHandler.liftBox();
+                    moveDistance(0.04, -65);
+                    turn180right();
+                    moveDistance(0.04, -65);
+                    break;
+                case 3:
+                    moveDistance(0.04, 65);
+                    break;
+                case 4:
+                    moveDistance(0.03, 65);
+                    turnBend(1);
+                    break;
+                case 5:
+                    motor.stopRobot();
+                    boxHandler.lowerArm();
+                    delay(1000);
+                    boxHandler.liftBox();
+                    break;
+                case 6:
+                    moveDistance(0.08, 65);
+                    boxHandler.lowerArm();
+                    moveDistance(0.05, -65);
+                    boxHandler.attachArm();
+                    break;
+            }
+            }
+            }
+  
+
+
+  default:
     irReader.readSensors(sensors);
     irReader.convertSensorsToBinary(sensors, binarySensors);
-    processLineFollowing(binarySensors); 
-    break ;
+    processLineFollowing(binarySensors);
+    break;
   }
 }
 
-/*
-while (historyIndex < historySize) {
-    straightMove(60);
-    delay(50);
-    // Read sensors
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
+  /*
+  while (historyIndex < historySize) {
+      straightMove(60);
+      delay(50);
+      // Read sensors
+      irReader.readSensors(sensors);
+      irReader.convertSensorsToBinary(sensors, binarySensors);
 
-    // Calculate the sum of binary sensors
-    int sum = 0;
-    for (int i = 0; i < 12; i++) {
-        sum += binarySensors[i];
+      // Calculate the sum of binary sensors
+      int sum = 0;
+      for (int i = 0; i < 12; i++) {
+          sum += binarySensors[i];
+      }
+
+      // Update sensor history based on the sum
+      if (sum > 8) {
+          senHistory[historyIndex] = 1; // White line
+      }  else {
+        senHistory[historyIndex] = 0;
+      }
+      Serial.print(senHistory[historyIndex]);
+      if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1) ) {
+      testCount = testCount+1 ;
+    }else{
+      testCount = 0 ;
     }
 
-    // Update sensor history based on the sum
-    if (sum > 8) {
-        senHistory[historyIndex] = 1; // White line
-    }  else {
-      senHistory[historyIndex] = 0;
-    }
-    Serial.print(senHistory[historyIndex]);
-    if ((binarySensors[0] == 0 && binarySensors[11] == 0 ) &&(binarySensors[5] == 1 || binarySensors[6] == 1|| binarySensors[4] == 1 || binarySensors[7] == 1|| binarySensors[3] == 1 || binarySensors[8] == 1|| binarySensors[2] == 1 || binarySensors[9] == 1) ) {
-    testCount = testCount+1 ;
-  }else{
-    testCount = 0 ;
+      if (testCount > 6 ){
+        motor.stopRobot();
+        delay(5000);
+        historyIndex = historySize+1 ;
+        break;
+      }
+
+      historyIndex++;
   }
+  */
 
-    if (testCount > 6 ){
-      motor.stopRobot();
-      delay(5000);
-      historyIndex = historySize+1 ;
-      break;
-    }
+  // uint16_t distance = tof.readRangeSingleMillimeters();
 
-    historyIndex++;
-}
-*/
+  // if (tof.timeoutOccurred()) {
+  //   oledDisplay.displayText("Sensor timeout!");
+  // } else {
+  //   //oledDisplay.displayText("Distance: " + String(distance) + " mm");
+  // }
+  // irReader.readSensors(sensors);
+  // irReader.convertSensorsToBinary(sensors, binarySensors);
 
+  // processLineFollowing(binarySensors);
 
+  // if (distance<30){
 
+  //   motor.stopRobot();
+  //   moveDistance(0.05,50);
+  //   boxHandler.grabBox();
+  //   boxHandler.liftBox();
+  //   turn180left();
+  //   boxHandler.lowerArm();
+  //    boxHandler.releaseBox();
+  //   while (true)
+  //   {
 
+  //   }
 
+  // }
 
+  // oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50);
 
-// uint16_t distance = tof.readRangeSingleMillimeters();
+  // colorSensor.readColor();
+  // oledDisplay.displayText(colorSensor.getDetectedColor(),1,0,20);
+  // readSensors(sensors);
+  //  updateSensorHistory(sen); // Update sensor history
 
-// if (tof.timeoutOccurred()) {
-//   oledDisplay.displayText("Sensor timeout!");
-// } else {
-//   //oledDisplay.displayText("Distance: " + String(distance) + " mm");
-// }
-// irReader.readSensors(sensors);
-// irReader.convertSensorsToBinary(sensors, binarySensors);
+  // oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
 
-// processLineFollowing(binarySensors);
+  // int direction = detectBend();
 
-// if (distance<30){
+  // if (allSensorsDetectBlack(binarySensors) && direction == -1 ) {
+  // motor.stopRobot();
+  // }
 
-//   motor.stopRobot();
-//   moveDistance(0.05,50);
-//   boxHandler.grabBox();
-//   boxHandler.liftBox();
-//   turn180left();
-//   boxHandler.lowerArm();
-//    boxHandler.releaseBox();
-//   while (true)
-//   {
+  // boxHandler.grabBox();    // Grab the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.liftBox();    // Lift the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.lowerArm();   // Lower the box
+  // delay(1000);             // Wait 1 second
+  // boxHandler.releaseBox(); // Release the box
+  // delay(2000);
 
-//   }
-
-// }
-
-// oledDisplay.displayText(String(L_encoder_ticks) + " " + String(R_encoder_ticks),1,0,50);
-
-// colorSensor.readColor();
-// oledDisplay.displayText(colorSensor.getDetectedColor(),1,0,20);
-// readSensors(sensors);
-//  updateSensorHistory(sen); // Update sensor history
-
-// oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
-
-// int direction = detectBend();
-
-// if (allSensorsDetectBlack(binarySensors) && direction == -1 ) {
-// motor.stopRobot();
-// }
-
-// boxHandler.grabBox();    // Grab the box
-// delay(1000);             // Wait 1 second
-// boxHandler.liftBox();    // Lift the box
-// delay(1000);             // Wait 1 second
-// boxHandler.lowerArm();   // Lower the box
-// delay(1000);             // Wait 1 second
-// boxHandler.releaseBox(); // Release the box
-// delay(2000);
-
-// if (direction == 0 || direction == 1 ){
-//   turnBend(direction);
-// }
-// else{
-//    processLineFollowing(binarySensors);
-// }
+  // if (direction == 0 || direction == 1 ){
+  //   turnBend(direction);
+  // }
+  // else{
+  //    processLineFollowing(binarySensors);
+  // }
 
   // for (int i = 0; i < historySize; i++) {
   //   Serial.print("Element ");
@@ -1349,6 +1501,3 @@ while (historyIndex < historySize) {
   //   Serial.print(": ");
   //   Serial.println(senHistory[i]); // Print each element on a new line
   //}
-
-
-

@@ -20,11 +20,11 @@ int findThreshold(int readings[], int size,int mode) {
     // Step 2: Take the middle value between the 50th and 750th values
     if(mode == 0){int threshold = readings[0] ;
 
-    return threshold - 50;}
+    return threshold - 100;}
     else{
     int threshold = readings[95];
 
-    return threshold + 50;
+    return threshold + 100; 
 }}
 
 // Function to calibrate all sensors and update threshold array
@@ -36,7 +36,7 @@ void calibrate(int thresholds[12],int mode) {
         for (int j = 0; j < numReadings; j++) {
             Serial.println(analogRead(A15-sensorIdx));
             history[sensorIdx][j] = analogRead(A15-sensorIdx);
-            delay(5);
+            delay(2);
         }
 
         // Find the threshold for the current sensor
