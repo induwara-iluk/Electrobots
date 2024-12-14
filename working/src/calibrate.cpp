@@ -2,44 +2,50 @@
 #include <calibrate.h>
 #include <MotorControl.h>
 
-int history[800];
-int threshold = 0;  // Variable to store the threshold value
+int history[12][100];  // 2D array to store sensor readings for each sensor
 
-int calibrate(int sensors[8]) {
-
-    // Set motor speeds to rotate the robot while taking readings
-    // Adjust speeds as needed for rotation
-
-    // Populate history array with sensor readings
-   
-    for (int j = 0; j < 800; j++) {
-        int i = j % 8;
-        history[j] = analogRead(A0 + i);
-        Serial.print(history[j]);
-        Serial.print(" ");
-    }
-    Serial.println();
-
-    // Stop the motors after readings are complete
-
-    // Sort the history array
-    for (int i = 0; i < 800 - 1; i++) {
-        for (int j = i + 1; j < 800; j++) {
-            if (history[i] > history[j]) {
-                int temp = history[i];
-                history[i] = history[j];
-                history[j] = temp;
+// Function to find the threshold for a single sensor
+int findThreshold(int readings[], int size,int mode) {
+    // Step 1: Sort the readings array
+    for (int i = 0; i < size - 1; i++) {
+        for (int j = 0; j < size - i - 1; j++) {
+            if (readings[j] > readings[j + 1]) {
+                int temp = readings[j];
+                readings[j] = readings[j + 1];
+                readings[j + 1] = temp;
             }
         }
     }
 
-    // Find the value at the 25th percentile
-    int quarterValue = history[200];
+    // Step 2: Take the middle value between the 50th and 750th values
+    if(mode == 0){int threshold = readings[0] ;
 
-    // Print the quarter value
-    Serial.print("Quarter value: ");
-    Serial.println(quarterValue);
+    return threshold - 50;}
+    else{
+    int threshold = readings[95];
 
-    // Return 100 less than the quarter value
-    return quarterValue - 100;
+    return threshold + 50;
+}}
+
+// Function to calibrate all sensors and update threshold array
+void calibrate(int thresholds[12],int mode) {
+    int numReadings = 100;
+
+    // Collect sensor readings for each sensor
+    for (int sensorIdx = 0; sensorIdx < 12; sensorIdx++) {
+        for (int j = 0; j < numReadings; j++) {
+            Serial.println(analogRead(A15-sensorIdx));
+            history[sensorIdx][j] = analogRead(A15-sensorIdx);
+            delay(5);
+        }
+
+        // Find the threshold for the current sensor
+        thresholds[sensorIdx] = findThreshold(history[sensorIdx], numReadings,mode);
+
+        // Print the threshold for the current sensor
+        Serial.print("Sensor ");
+        Serial.print(sensorIdx);
+        Serial.print(" Threshold: ");
+        Serial.println(thresholds[sensorIdx]);
+    }
 }
