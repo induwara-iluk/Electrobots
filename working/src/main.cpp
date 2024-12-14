@@ -30,7 +30,7 @@ ServoController boxHandler;
 #define switch2 35
 #define switch3 37
 #define switch4 39
-
+int bendNumber = 0 ;
 int stage = 0 ;
 int testCount = 0 ;
 int colour;
@@ -1095,16 +1095,86 @@ void loop() {
         break;
 
         case 8:
-            irReader.setColour(1);
-            irReader.readSensors(sensors);
-            irReader.convertSensorsToBinary(sensors, binarySensors);
-            processLineFollowing(binarySensors);
-            if (allSensorsDetectwhite(sensors)) {
-                motor.stopRobot();
-                moveDistance(0.04, -65);
-                turnBend(0);
-            }
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    //oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
+    processLineFollowing(binarySensors);
+    oledDisplay.displayText(String(bendNumber) ,2,0,0);
+
+    if(junctionDetected(binarySensors) ){ 
+      LED(1);
+      delay(500);
+      LED(0);
+      bendNumber++;
+       
+       switch (bendNumber) {
+            case 1:
+                
+
+                
+            moveDistance(0.04,65);                
+            motor.stopRobot();
+            delay(1000);
+
+            turnBend(0);
+
+            moveDistance(0.02,65);
+
+            
+
+                        
             break;
+
+            case 2:
+            //oledDisplay.displayText(String(bendNumber) ,2,0,0);
+            motor.stopRobot();
+            delay(2000);
+            turnBend(0);
+          
+                        
+                        // while(!allSensorsDetectwhite(sensors)){
+                        //   irReader.readSensors(sensors);
+                        // irReader.convertSensorsToBinary(sensors, binarySensors);
+                        // //oledDisplay.displayText(irValues_str + "        " + "Kp = "+ String(Kp) ,1,0,0);
+                        // processLineFollowing(binarySensors);
+                        // }
+                        // motor.stopRobot();
+                        // delay(500);
+                        // boxHandler.grabBox();
+                        // boxHandler.liftBox();
+                break;
+
+            case 3:
+                //oledDisplay.displayText(String(bendNumber) ,2,0,0);
+                boxHandler.grabBox();
+                boxHandler.liftBox();
+                turn180left();
+                
+
+                        
+                break;
+
+            case 4:
+                turnBend(1);
+                bendNumber+= 1;
+                
+                        
+                break; 
+
+
+                    }
+
+
+     }
+    
+
+    
+
+
+
+
+
+    break;
 
         default:
             irReader.readSensors(sensors);
@@ -1118,6 +1188,7 @@ void loop() {
             irReader.convertSensorsToBinary(sensors, binarySensors);
             if(allSensorsDetectwhite(sensors)){
               motor.stopRobot();
+              delay(1000);
               moveDistance(0.06 , 65);
               irReader.readSensors(sensors);
               irReader.convertSensorsToBinary(sensors, binarySensors);
@@ -1132,6 +1203,25 @@ void loop() {
 
     break ;
     
+    
+
+
+    case 6:
+    moveDistance(0.08, 65);
+    while (true){
+    irReader.readSensors(sensors);
+    irReader.convertSensorsToBinary(sensors, binarySensors);
+    if (allSensorsDetectwhite(sensors)){
+      motor.stopRobot();
+      moveDistance(0.04, -65);
+      motor.stopRobot();
+      delay(1000);
+      stage = 5;
+    }else{
+      processLineFollowing(binarySensors);
+    }
+    }
+    break;
     case 7 : 
     irReader.setColour(0);
     irReader.readSensors(sensors);
@@ -1141,17 +1231,6 @@ void loop() {
             processLineFollowing(binarySensors);
             break;
 
-
-    case 6:
-    while (true)
-    
-    {
-      /* code */
-    }
-    
-    
-    stage = 7;
-    break;
     case 9 :// padda padda yana eka 
     irReader.setColour(1);
     irReader.readSensors(sensors);
