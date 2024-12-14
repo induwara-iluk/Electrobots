@@ -1131,27 +1131,7 @@ void loop() {
             processLineFollowing(binarySensors);}
 
     break ;
-    case 6 :
     
-
-    while(binarySensors[0] == 0 && binarySensors[11]==0){
-      irReader.setColour(0);
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-        processLineFollowing(binarySensors); 
-        }
-        motor.stopRobot();
-        delay(1000);
-        while(binarySensors[0] != 0 && binarySensors[11]!=0){
-      irReader.setColour(0);
-    irReader.readSensors(sensors);
-    irReader.convertSensorsToBinary(sensors, binarySensors);
-        processLineFollowing(binarySensors); 
-        }
-
-        stage = 7 ;
-       
-        break;
     case 7 : 
     irReader.setColour(0);
     irReader.readSensors(sensors);
